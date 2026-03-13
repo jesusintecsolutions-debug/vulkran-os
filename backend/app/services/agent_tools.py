@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Client, Conversation, AgentTask, Notification
 from app.models.content import ContentBatch, ContentItem
+from app.models.lead import Lead, LeadActivity
 from app.services.file_storage import FileStorage
 from app.services.content_engine import generate_batch
 
@@ -164,6 +165,80 @@ TOOLS = [
                 },
             },
             "required": [],
+        },
+    },
+    {
+        "name": "create_lead",
+        "description": "Create a new lead in the CRM pipeline. Use when a potential client is identified.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Lead contact name",
+                },
+                "company": {
+                    "type": "string",
+                    "description": "Company name",
+                },
+                "email": {
+                    "type": "string",
+                    "description": "Contact email",
+                },
+                "phone": {
+                    "type": "string",
+                    "description": "Contact phone",
+                },
+                "source": {
+                    "type": "string",
+                    "description": "Lead source: web, referral, linkedin, cold_outreach, event, other",
+                },
+                "estimated_value": {
+                    "type": "number",
+                    "description": "Estimated monthly value in EUR",
+                },
+                "notes": {
+                    "type": "string",
+                    "description": "Additional notes about this lead",
+                },
+            },
+            "required": ["name"],
+        },
+    },
+    {
+        "name": "get_pipeline_status",
+        "description": "Get CRM pipeline overview: leads by stage, total value, recent activity.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "stage": {
+                    "type": "string",
+                    "description": "Optional: filter by stage (new, contacted, meeting, proposal, negotiation, won, lost)",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "update_lead_stage",
+        "description": "Move a lead to a new pipeline stage.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "lead_id": {
+                    "type": "string",
+                    "description": "UUID of the lead",
+                },
+                "stage": {
+                    "type": "string",
+                    "description": "New stage: new, contacted, meeting, proposal, negotiation, won, lost",
+                },
+                "notes": {
+                    "type": "string",
+                    "description": "Notes about this stage change",
+                },
+            },
+            "required": ["lead_id", "stage"],
         },
     },
     {
@@ -374,6 +449,111 @@ class ToolExecutor:
             "items_pending_review": review_count,
         }
 
+    async def _tool_create_lead(self, _input: dict) -> dict:
+        from decimal import Decimal
+
+        lead = Lead(
+            name=_input["name"],
+            company=_input.get("company"),
+            email=_input.get("email"),
+            phone=_input.get("phone"),
+            source=_input.get("source"),
+            estimated_value=Decimal(str(_input["estimated_value"])) if _input.get("estimated_value") else None,
+            notes=_input.get("notes"),
+            owner_id=self.user_id,
+            stage="new",
+        )
+        self.db.add(lead)
+        await self.db.flush()
+
+        activity = LeadActivity(
+            lead_id=lead.id,
+            activity_type="note",
+            description=f"Lead creado via agente: {lead.name}" + (f" ({lead.company})" if lead.company else ""),
+            created_by=self.user_id,
+        )
+        self.db.add(activity)
+        await self.db.flush()
+
+        return {
+            "lead_id": str(lead.id),
+            "name": lead.name,
+            "company": lead.company,
+            "stage": lead.stage,
+            "status": "created",
+        }
+
+    async def _tool_get_pipeline_status(self, _input: dict) -> dict:
+        stage_filter = _input.get("stage")
+
+        query = select(Lead).order_by(Lead.created_at.desc())
+        if stage_filter:
+            query = query.where(Lead.stage == stage_filter)
+        query = query.limit(20)
+
+        result = await self.db.execute(query)
+        leads = result.scalars().all()
+
+        # Count by stage
+        stage_result = await self.db.execute(
+            select(Lead.stage, func.count()).group_by(Lead.stage)
+        )
+        by_stage = {row[0]: row[1] for row in stage_result.all()}
+
+        total_value = await self.db.scalar(
+            select(func.sum(Lead.estimated_value)).where(
+                Lead.stage.notin_(["won", "lost"])
+            )
+        )
+
+        return {
+            "pipeline": by_stage,
+            "total_active_value": str(total_value) if total_value else "0",
+            "leads": [
+                {
+                    "id": str(l.id),
+                    "name": l.name,
+                    "company": l.company,
+                    "stage": l.stage,
+                    "estimated_value": str(l.estimated_value) if l.estimated_value else None,
+                    "next_action": l.next_action,
+                }
+                for l in leads
+            ],
+        }
+
+    async def _tool_update_lead_stage(self, _input: dict) -> dict:
+        lead_id = _input["lead_id"]
+        new_stage = _input["stage"]
+
+        result = await self.db.execute(
+            select(Lead).where(Lead.id == uuid.UUID(lead_id))
+        )
+        lead = result.scalar_one_or_none()
+        if not lead:
+            return {"error": f"Lead {lead_id} not found"}
+
+        old_stage = lead.stage
+        lead.stage = new_stage
+
+        activity = LeadActivity(
+            lead_id=lead.id,
+            activity_type="stage_change",
+            description=f"Etapa: {old_stage} → {new_stage}" + (f" | {_input.get('notes', '')}" if _input.get("notes") else ""),
+            metadata_={"from_stage": old_stage, "to_stage": new_stage},
+            created_by=self.user_id,
+        )
+        self.db.add(activity)
+        await self.db.flush()
+
+        return {
+            "lead_id": str(lead.id),
+            "name": lead.name,
+            "old_stage": old_stage,
+            "new_stage": new_stage,
+            "status": "updated",
+        }
+
     async def _tool_get_system_status(self, _input: dict) -> dict:
         clients_count = await self.db.scalar(
             select(func.count()).select_from(Client).where(Client.status == "active")
@@ -383,8 +563,14 @@ class ToolExecutor:
             .select_from(AgentTask)
             .where(AgentTask.status.in_(["pending", "running"]))
         )
+        leads_count = await self.db.scalar(
+            select(func.count()).select_from(Lead).where(
+                Lead.stage.notin_(["won", "lost"])
+            )
+        )
         return {
             "active_clients": clients_count or 0,
             "pending_tasks": pending_tasks or 0,
+            "active_leads": leads_count or 0,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }

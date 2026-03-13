@@ -4,6 +4,7 @@ from app.routers.agent import router as agent_router
 from app.routers.notifications import router as notifications_router
 from app.routers.files import router as files_router
 from app.routers.content import router as content_router
+from app.routers.leads import router as leads_router
 
 __all__ = [
     "auth_router",
@@ -12,4 +13,5 @@ __all__ = [
     "notifications_router",
     "files_router",
     "content_router",
+    "leads_router",
 ]

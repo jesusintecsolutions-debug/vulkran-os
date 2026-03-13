@@ -76,3 +76,18 @@
 - **6 plantillas seed**: instagram-post, instagram-carousel, linkedin-post, blog-article, reel-script, email-newsletter
 - **Agent tools**: create_content_batch (crea + genera batch completo), get_content_status (resumen de batches y items)
 - **Testado en producción**: generación de 3 posts Instagram en ~18s con contenido profesional
+
+### Fase 4: Leads/CRM
+- **Modelos**: Lead, LeadActivity
+  - Lead: pipeline completo (new → contacted → meeting → proposal → negotiation → won/lost)
+  - LeadActivity: log automático de cada acción (notas, emails, llamadas, cambios de etapa)
+  - Campos: name, company, email, phone, source, estimated_value, tags, next_action, lost_reason
+- **Endpoints**:
+  - CRUD: GET /api/leads, POST /api/leads, GET /api/leads/{id}, PATCH /api/leads/{id}, DELETE /api/leads/{id}
+  - Pipeline: GET /api/leads/pipeline (stats por etapa, valor total, won/lost del mes)
+  - Stage: POST /api/leads/{id}/stage (cambio de etapa con log automático)
+  - Activities: GET /api/leads/{id}/activities, POST /api/leads/{id}/activities
+  - Filtros: stage, source, search (nombre/empresa)
+- **Agent tools**: create_lead, get_pipeline_status, update_lead_stage
+- **get_system_status actualizado**: ahora incluye active_leads
+- **Testado en producción**: 2 leads creados, pipeline stats con valor total 1050€, stage change con activity log
