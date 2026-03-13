@@ -1,25 +1,35 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useEffect } from 'react'
+import { Suspense, lazy, useEffect } from 'react'
 import { useAuthStore } from '@/stores/auth'
 
 import AppLayout from '@/layouts/AppLayout'
 import LoginPage from '@/pages/auth/LoginPage'
 import DashboardPage from '@/pages/dashboard/DashboardPage'
-import ClientsPage from '@/pages/clients/ClientsPage'
-import ContentPage from '@/pages/content/ContentPage'
-import LeadsPage from '@/pages/leads/LeadsPage'
-import AccountingPage from '@/pages/accounting/AccountingPage'
-import BriefingPage from '@/pages/briefing/BriefingPage'
-import ChatPage from '@/pages/chat/ChatPage'
-import FilesPage from '@/pages/files/FilesPage'
-import SettingsPage from '@/pages/settings/SettingsPage'
+
+// Lazy-loaded pages (code-split chunks)
+const ClientsPage = lazy(() => import('@/pages/clients/ClientsPage'))
+const ContentPage = lazy(() => import('@/pages/content/ContentPage'))
+const LeadsPage = lazy(() => import('@/pages/leads/LeadsPage'))
+const AccountingPage = lazy(() => import('@/pages/accounting/AccountingPage'))
+const BriefingPage = lazy(() => import('@/pages/briefing/BriefingPage'))
+const ChatPage = lazy(() => import('@/pages/chat/ChatPage'))  // includes Three.js
+const FilesPage = lazy(() => import('@/pages/files/FilesPage'))
+const SettingsPage = lazy(() => import('@/pages/settings/SettingsPage'))
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: { retry: 1, refetchOnWindowFocus: false },
   },
 })
+
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center h-64">
+      <div className="h-8 w-8 rounded-full border-2 border-vulkran border-t-transparent animate-spin" />
+    </div>
+  )
+}
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuthStore()
@@ -61,14 +71,14 @@ export default function App() {
               }
             >
               <Route index element={<DashboardPage />} />
-              <Route path="clients" element={<ClientsPage />} />
-              <Route path="content" element={<ContentPage />} />
-              <Route path="leads" element={<LeadsPage />} />
-              <Route path="accounting" element={<AccountingPage />} />
-              <Route path="briefing" element={<BriefingPage />} />
-              <Route path="chat" element={<ChatPage />} />
-              <Route path="files" element={<FilesPage />} />
-              <Route path="settings" element={<SettingsPage />} />
+              <Route path="clients" element={<Suspense fallback={<PageLoader />}><ClientsPage /></Suspense>} />
+              <Route path="content" element={<Suspense fallback={<PageLoader />}><ContentPage /></Suspense>} />
+              <Route path="leads" element={<Suspense fallback={<PageLoader />}><LeadsPage /></Suspense>} />
+              <Route path="accounting" element={<Suspense fallback={<PageLoader />}><AccountingPage /></Suspense>} />
+              <Route path="briefing" element={<Suspense fallback={<PageLoader />}><BriefingPage /></Suspense>} />
+              <Route path="chat" element={<Suspense fallback={<PageLoader />}><ChatPage /></Suspense>} />
+              <Route path="files" element={<Suspense fallback={<PageLoader />}><FilesPage /></Suspense>} />
+              <Route path="settings" element={<Suspense fallback={<PageLoader />}><SettingsPage /></Suspense>} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

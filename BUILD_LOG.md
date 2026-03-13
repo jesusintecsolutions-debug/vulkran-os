@@ -211,3 +211,13 @@
 - **Content padding**: p-4 móvil, p-6 desktop, pb-20 móvil (espacio para bottom nav)
 - **ChatPage**: márgenes responsivos -m-4 md:-m-6
 - **HTML**: título "VULKRAN OS", theme-color dark
+
+### Fase E: Code Splitting & Performance
+- **Lazy loading**: 8 páginas con `React.lazy()` + `Suspense` (solo Dashboard eagerly loaded)
+- **Code splitting**: Three.js/HoloBrain solo se carga al acceder a ChatPage
+- **Bundle sizes** (post-split):
+  - index.js: 316KB (era 1.6MB) — core app sin Three.js
+  - ChatPage.js: 1.1MB (lazy) — incluye Three.js, @react-three/*
+  - ui.js: 159KB — framer-motion + componentes UI compartidos
+  - Páginas individuales: 0.7KB–2.2KB cada una
+- **PageLoader**: spinner consistente como fallback de Suspense
