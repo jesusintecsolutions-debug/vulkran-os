@@ -112,3 +112,25 @@
   - Summary: GET /api/accounting/summary?year=&month= (facturado, cobrado, pendiente, gastos, income neto, IVA)
 - **Agent tool**: get_financial_summary — resumen financiero por mes
 - **Testado en producción**: factura VK-2026-001 (600€ + 126€ IVA = 726€), gasto hosting 12.99€, income neto 713.01€
+
+### Fase 8: Frontend — Scaffold & Core Pages
+- **Stack**: React 19 + Vite 8 + TypeScript + Tailwind CSS v4 + React Router v7 + TanStack Query + Zustand + Axios + Lucide React
+- **Arquitectura modular**: estructura de carpetas preparada para crecimiento (pages/, layouts/, components/ui/, stores/, hooks/, api/, lib/)
+- **Diseño**: sistema de tokens custom con colores VULKRAN (#6d28d9), sidebar + top bar layout, badges por estado
+- **Auth completa**: login con JWT, Zustand store (login/logout/loadUser), rutas protegidas con redirect a /login, interceptor Axios 401
+- **API client**: Axios con baseURL configurable (VITE_API_URL), interceptor JWT en requests, refresh token handling
+- **Routing**: React Router v7, rutas protegidas con ProtectedRoute wrapper, role-based sidebar navigation
+- **Páginas implementadas**:
+  - **LoginPage**: formulario email/password con error handling y loading state
+  - **DashboardPage**: 4 stat cards (clientes/MRR, leads/pipeline, contenido 24h, tareas) + pipeline breakdown
+  - **ClientsPage**: tabla con nombre, sector, email, cuota mensual, estado
+  - **ContentPage**: grid de cards con badges de estado colorizados (draft, generating, review, approved, published, failed)
+  - **LeadsPage**: tabla pipeline con nombre, empresa, origen, etapa (badges), valor estimado
+  - **AccountingPage**: tabla facturas con nº, fecha, vencimiento, estado (badges), total
+  - **BriefingPage**: briefing diario generado por AI con timestamp
+  - **ChatPage**: chat completo con el agente AI (mensajes user/assistant, loading state, scroll automático)
+  - **FilesPage**: placeholder para gestor de archivos
+  - **SettingsPage**: perfil del usuario actual
+- **AppLayout**: sidebar izquierdo (w-60) con 9 items de navegación filtrados por rol, header con título dinámico + campana notificaciones, footer con avatar + logout
+- **Build**: 0 errores TypeScript, build de producción OK (352KB JS + 19KB CSS)
+- **Config**: vite.config.ts con @tailwindcss/vite, path alias @/, proxy API dev
