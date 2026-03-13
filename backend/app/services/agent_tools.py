@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import Client, Conversation, AgentTask, Notification
 from app.models.content import ContentBatch, ContentItem
 from app.models.lead import Lead, LeadActivity
+from app.models.accounting import Invoice, Expense
 from app.services.file_storage import FileStorage
 from app.services.content_engine import generate_batch
 from app.services.daily_briefing import generate_briefing
@@ -248,6 +249,24 @@ TOOLS = [
         "input_schema": {
             "type": "object",
             "properties": {},
+            "required": [],
+        },
+    },
+    {
+        "name": "get_financial_summary",
+        "description": "Get financial summary: invoiced, paid, pending, expenses, net income for current or specified month.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "year": {
+                    "type": "integer",
+                    "description": "Year (default: current year)",
+                },
+                "month": {
+                    "type": "integer",
+                    "description": "Month 1-12 (default: current month)",
+                },
+            },
             "required": [],
         },
     },
@@ -567,6 +586,46 @@ class ToolExecutor:
     async def _tool_get_daily_briefing(self, _input: dict) -> dict:
         result = await generate_briefing(self.db)
         return result
+
+    async def _tool_get_financial_summary(self, _input: dict) -> dict:
+        from datetime import datetime as dt, timezone as tz
+        from sqlalchemy import extract as sql_extract
+        from decimal import Decimal
+
+        now = dt.now(tz.utc)
+        y = _input.get("year") or now.year
+        m = _input.get("month") or now.month
+
+        total_invoiced = await self.db.scalar(
+            select(func.coalesce(func.sum(Invoice.total), 0)).where(
+                sql_extract("year", Invoice.issue_date) == y,
+                sql_extract("month", Invoice.issue_date) == m,
+            )
+        ) or Decimal("0")
+
+        total_paid = await self.db.scalar(
+            select(func.coalesce(func.sum(Invoice.total), 0)).where(
+                Invoice.status == "paid",
+                sql_extract("year", Invoice.issue_date) == y,
+                sql_extract("month", Invoice.issue_date) == m,
+            )
+        ) or Decimal("0")
+
+        total_expenses = await self.db.scalar(
+            select(func.coalesce(func.sum(Expense.amount), 0)).where(
+                sql_extract("year", Expense.date) == y,
+                sql_extract("month", Expense.date) == m,
+            )
+        ) or Decimal("0")
+
+        return {
+            "period": f"{y}-{m:02d}",
+            "total_invoiced": str(total_invoiced),
+            "total_paid": str(total_paid),
+            "total_pending": str(total_invoiced - total_paid),
+            "total_expenses": str(total_expenses),
+            "net_income": str(total_paid - total_expenses),
+        }
 
     async def _tool_get_system_status(self, _input: dict) -> dict:
         clients_count = await self.db.scalar(

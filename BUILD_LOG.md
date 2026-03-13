@@ -101,3 +101,14 @@
 - **ARQ cron job**: daily_briefing_job ejecuta a las 07:00 UTC (08:00 Madrid), genera briefing + notificación a admins
 - **Agent tool**: get_daily_briefing — el agente puede generar el briefing bajo demanda
 - **Testado en producción**: briefing generado en ~5s con Haiku, métricas reales (3 clientes, 1190€ MRR, 2 leads, 1 batch)
+
+### Fase 6: Accounting
+- **Modelos**: Invoice, Expense
+  - Invoice: numeración automática VK-YYYY-NNN, cálculo IVA (21% default), items JSONB, workflow (draft → sent → paid → overdue → cancelled)
+  - Expense: categorías (hosting, software, marketing, tools, freelancer...), deducibilidad fiscal, vinculable a cliente
+- **Endpoints**:
+  - Invoices: GET /api/accounting/invoices, POST /api/accounting/invoices, GET /{id}, POST /{id}/send, POST /{id}/pay
+  - Expenses: GET /api/accounting/expenses, POST /api/accounting/expenses
+  - Summary: GET /api/accounting/summary?year=&month= (facturado, cobrado, pendiente, gastos, income neto, IVA)
+- **Agent tool**: get_financial_summary — resumen financiero por mes
+- **Testado en producción**: factura VK-2026-001 (600€ + 126€ IVA = 726€), gasto hosting 12.99€, income neto 713.01€

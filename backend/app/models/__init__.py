@@ -4,6 +4,7 @@ from app.models.conversation import Conversation, Message, AgentTask
 from app.models.notification import Notification, Setting
 from app.models.content import ContentTemplate, ContentBatch, ContentItem
 from app.models.lead import Lead, LeadActivity
+from app.models.accounting import Invoice, Expense
 
 __all__ = [
     "User",
@@ -19,4 +20,6 @@ __all__ = [
     "ContentItem",
     "Lead",
     "LeadActivity",
+    "Invoice",
+    "Expense",
 ]
