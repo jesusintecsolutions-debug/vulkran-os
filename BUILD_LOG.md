@@ -55,3 +55,24 @@
 - **Docker Compose**: Caddy ahora monta ./data:/data:ro (read-only)
 - **Agent tool**: list_client_files — el agente puede consultar archivos de clientes
 - **Estructura por cliente**: brand/, templates/static/, templates/video/, content/, invoices/
+
+### Fase 3: Content Engine
+- **Modelos**: ContentTemplate, ContentBatch, ContentItem
+  - ContentTemplate: plantillas reutilizables por plataforma/tipo (prompt_template, schema_fields, visual_template)
+  - ContentBatch: lote de contenido para un cliente (status workflow: draft → generating → review → approved → published)
+  - ContentItem: pieza individual con content_data (JSONB), posición, estado independiente
+- **Content Engine service**: generación via Claude API
+  - Construye prompt enriquecido con brand_config del cliente + template + brief
+  - Parseo robusto de JSON (maneja markdown wrapping)
+  - Regeneración individual de items con feedback
+  - Metadata de generación (tokens, tiempo, modelo)
+- **Endpoints**:
+  - Templates: GET /api/content/templates, POST /api/content/templates, GET /api/content/templates/{id}
+  - Batches: GET /api/content/batches, POST /api/content/batches, GET /api/content/batches/{id}
+  - Generate: POST /api/content/batches/{id}/generate (llama a Claude, genera items)
+  - Approve: POST /api/content/batches/{id}/approve
+  - Items: GET /api/content/batches/{id}/items, PATCH /api/content/items/{id}, POST /api/content/items/{id}/regenerate
+  - Seed: POST /api/content/seed-templates (carga 6 plantillas base)
+- **6 plantillas seed**: instagram-post, instagram-carousel, linkedin-post, blog-article, reel-script, email-newsletter
+- **Agent tools**: create_content_batch (crea + genera batch completo), get_content_status (resumen de batches y items)
+- **Testado en producción**: generación de 3 posts Instagram en ~18s con contenido profesional

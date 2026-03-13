@@ -13,7 +13,9 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Client, Conversation, AgentTask, Notification
+from app.models.content import ContentBatch, ContentItem
 from app.services.file_storage import FileStorage
+from app.services.content_engine import generate_batch
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +112,58 @@ TOOLS = [
                 },
             },
             "required": ["client_id"],
+        },
+    },
+    {
+        "name": "create_content_batch",
+        "description": "Create and generate a content batch for a client. Uses Claude to generate marketing content (posts, carousels, etc.) based on client brand config and brief.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "client_id": {
+                    "type": "string",
+                    "description": "UUID of the client",
+                },
+                "title": {
+                    "type": "string",
+                    "description": "Batch title (e.g. 'Instagram posts March week 2')",
+                },
+                "brief": {
+                    "type": "string",
+                    "description": "Creative brief / instructions for content generation",
+                },
+                "platform": {
+                    "type": "string",
+                    "description": "Target platform: instagram, youtube, linkedin, blog, email, twitter",
+                },
+                "item_count": {
+                    "type": "integer",
+                    "description": "Number of content pieces to generate (default 5)",
+                },
+                "tone": {
+                    "type": "string",
+                    "description": "Tone: formal, casual, energetic, professional",
+                },
+                "language": {
+                    "type": "string",
+                    "description": "Language code (default 'es')",
+                },
+            },
+            "required": ["client_id", "title", "brief"],
+        },
+    },
+    {
+        "name": "get_content_status",
+        "description": "Get content generation status: recent batches, items pending review, content stats per client.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "client_id": {
+                    "type": "string",
+                    "description": "Optional: filter by client UUID. Leave empty for all clients.",
+                },
+            },
+            "required": [],
         },
     },
     {
@@ -247,6 +301,77 @@ class ToolExecutor:
             "category": category or "all",
             "file_count": len(files),
             "files": files[:20],  # Limit to avoid token overflow
+        }
+
+    async def _tool_create_content_batch(self, _input: dict) -> dict:
+        client_id = _input["client_id"]
+        result = await self.db.execute(
+            select(Client).where(Client.id == uuid.UUID(client_id))
+        )
+        client = result.scalar_one_or_none()
+        if not client:
+            return {"error": f"Client {client_id} not found"}
+
+        # Create batch
+        batch = ContentBatch(
+            client_id=client.id,
+            title=_input["title"],
+            brief=_input.get("brief"),
+            platform=_input.get("platform"),
+            status="draft",
+            item_count=0,
+        )
+        self.db.add(batch)
+        await self.db.flush()
+
+        # Generate content
+        batch = await generate_batch(
+            db=self.db,
+            batch=batch,
+            brief=_input.get("brief"),
+            item_count=_input.get("item_count", 5),
+            tone=_input.get("tone"),
+            language=_input.get("language", "es"),
+            user_id=self.user_id,
+        )
+
+        return {
+            "batch_id": str(batch.id),
+            "status": batch.status,
+            "item_count": batch.item_count,
+            "client": client.name,
+            "title": batch.title,
+        }
+
+    async def _tool_get_content_status(self, _input: dict) -> dict:
+        query = select(ContentBatch).order_by(ContentBatch.created_at.desc()).limit(10)
+        client_id = _input.get("client_id")
+        if client_id:
+            query = query.where(ContentBatch.client_id == uuid.UUID(client_id))
+
+        result = await self.db.execute(query)
+        batches = result.scalars().all()
+
+        # Count items pending review
+        review_count = await self.db.scalar(
+            select(func.count())
+            .select_from(ContentItem)
+            .where(ContentItem.status == "generated")
+        ) or 0
+
+        return {
+            "recent_batches": [
+                {
+                    "id": str(b.id),
+                    "title": b.title,
+                    "status": b.status,
+                    "platform": b.platform,
+                    "item_count": b.item_count,
+                    "created_at": b.created_at.isoformat() if b.created_at else None,
+                }
+                for b in batches
+            ],
+            "items_pending_review": review_count,
         }
 
     async def _tool_get_system_status(self, _input: dict) -> dict:

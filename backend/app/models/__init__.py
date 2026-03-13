@@ -2,6 +2,7 @@ from app.models.user import User
 from app.models.client import Client, ClientUser
 from app.models.conversation import Conversation, Message, AgentTask
 from app.models.notification import Notification, Setting
+from app.models.content import ContentTemplate, ContentBatch, ContentItem
 
 __all__ = [
     "User",
@@ -12,4 +13,7 @@ __all__ = [
     "AgentTask",
     "Notification",
     "Setting",
+    "ContentTemplate",
+    "ContentBatch",
+    "ContentItem",
 ]
