@@ -17,6 +17,7 @@ from app.models.content import ContentBatch, ContentItem
 from app.models.lead import Lead, LeadActivity
 from app.services.file_storage import FileStorage
 from app.services.content_engine import generate_batch
+from app.services.daily_briefing import generate_briefing
 
 logger = logging.getLogger(__name__)
 
@@ -239,6 +240,15 @@ TOOLS = [
                 },
             },
             "required": ["lead_id", "stage"],
+        },
+    },
+    {
+        "name": "get_daily_briefing",
+        "description": "Generate today's executive daily briefing with business metrics, pipeline status, content activity, and priority actions.",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
         },
     },
     {
@@ -553,6 +563,10 @@ class ToolExecutor:
             "new_stage": new_stage,
             "status": "updated",
         }
+
+    async def _tool_get_daily_briefing(self, _input: dict) -> dict:
+        result = await generate_briefing(self.db)
+        return result
 
     async def _tool_get_system_status(self, _input: dict) -> dict:
         clients_count = await self.db.scalar(

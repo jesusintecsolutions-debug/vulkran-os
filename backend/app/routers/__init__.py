@@ -5,6 +5,7 @@ from app.routers.notifications import router as notifications_router
 from app.routers.files import router as files_router
 from app.routers.content import router as content_router
 from app.routers.leads import router as leads_router
+from app.routers.briefing import router as briefing_router
 
 __all__ = [
     "auth_router",
@@ -14,4 +15,5 @@ __all__ = [
     "files_router",
     "content_router",
     "leads_router",
+    "briefing_router",
 ]

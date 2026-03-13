@@ -91,3 +91,13 @@
 - **Agent tools**: create_lead, get_pipeline_status, update_lead_stage
 - **get_system_status actualizado**: ahora incluye active_leads
 - **Testado en producción**: 2 leads creados, pipeline stats con valor total 1050€, stage change con activity log
+
+### Fase 5: Daily Briefing
+- **Daily Briefing service**: recopila métricas de negocio y genera resumen ejecutivo con Claude Haiku
+  - Métricas: clientes activos + MRR, pipeline leads por etapa + valor, contenido en revisión + generado 24h, tareas pendientes, acciones próximas
+  - Generación de briefing con Claude Haiku (rápido + económico)
+  - Briefing estructurado: resumen, clientes, pipeline, contenido, acciones prioritarias
+- **Endpoints**: GET /api/briefing (briefing completo con AI), GET /api/briefing/metrics (métricas raw)
+- **ARQ cron job**: daily_briefing_job ejecuta a las 07:00 UTC (08:00 Madrid), genera briefing + notificación a admins
+- **Agent tool**: get_daily_briefing — el agente puede generar el briefing bajo demanda
+- **Testado en producción**: briefing generado en ~5s con Haiku, métricas reales (3 clientes, 1190€ MRR, 2 leads, 1 batch)
