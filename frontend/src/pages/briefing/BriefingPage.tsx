@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/api/client'
+import { GlassCard, Badge } from '@/components/ui'
+import { Newspaper } from 'lucide-react'
 
 interface Briefing {
   metrics: Record<string, unknown>
@@ -13,24 +15,30 @@ export default function BriefingPage() {
     queryFn: async () => (await api.get('/briefing')).data,
   })
 
-  if (isLoading) return <div className="text-muted-foreground">Generando briefing...</div>
+  if (isLoading) return (
+    <div className="flex flex-col items-center justify-center h-64 gap-3">
+      <div className="h-8 w-8 rounded-full border-2 border-vulkran border-t-transparent animate-spin" />
+      <p className="text-sm text-muted-foreground">Generando briefing con IA...</p>
+    </div>
+  )
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Briefing Diario</h1>
+        <div className="flex items-center gap-3">
+          <Newspaper className="h-6 w-6 text-vulkran-light" />
+          <h1 className="text-2xl font-bold">Briefing Diario</h1>
+        </div>
         {data?.generated_at && (
-          <span className="text-xs text-muted-foreground">
-            {new Date(data.generated_at).toLocaleString('es-ES')}
-          </span>
+          <Badge variant="purple">{new Date(data.generated_at).toLocaleString('es-ES')}</Badge>
         )}
       </div>
 
-      <div className="rounded-lg border bg-card p-6">
-        <div className="prose prose-sm max-w-none whitespace-pre-wrap text-card-foreground">
+      <GlassCard variant="strong" className="max-w-3xl">
+        <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
           {data?.summary || 'Sin datos disponibles.'}
         </div>
-      </div>
+      </GlassCard>
     </div>
   )
 }

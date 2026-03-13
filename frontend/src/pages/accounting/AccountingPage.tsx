@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/api/client'
+import { GlassCard, Badge } from '@/components/ui'
 
 interface Invoice {
   id: string
@@ -11,12 +12,12 @@ interface Invoice {
   due_date: string
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  draft: 'bg-gray-100 text-gray-700',
-  sent: 'bg-blue-100 text-blue-700',
-  paid: 'bg-green-100 text-green-700',
-  overdue: 'bg-red-100 text-red-700',
-  cancelled: 'bg-gray-100 text-gray-400',
+const STATUS_VARIANT: Record<string, 'default' | 'info' | 'success' | 'error'> = {
+  draft: 'default',
+  sent: 'info',
+  paid: 'success',
+  overdue: 'error',
+  cancelled: 'default',
 }
 
 export default function AccountingPage() {
@@ -25,40 +26,36 @@ export default function AccountingPage() {
     queryFn: async () => (await api.get('/accounting/invoices')).data,
   })
 
-  if (isLoading) return <div className="text-muted-foreground">Cargando...</div>
+  if (isLoading) return <div className="flex items-center justify-center h-64"><div className="h-8 w-8 rounded-full border-2 border-vulkran border-t-transparent animate-spin" /></div>
 
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-bold">Contabilidad</h1>
 
-      <div className="rounded-lg border">
+      <GlassCard hover={false} className="overflow-hidden !p-0">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b bg-muted/50 text-left">
-              <th className="px-4 py-3 font-medium">Nº Factura</th>
-              <th className="px-4 py-3 font-medium">Fecha</th>
-              <th className="px-4 py-3 font-medium">Vencimiento</th>
-              <th className="px-4 py-3 font-medium">Estado</th>
-              <th className="px-4 py-3 font-medium text-right">Total</th>
+            <tr className="border-b border-border text-left">
+              <th className="px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">Nº Factura</th>
+              <th className="px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">Fecha</th>
+              <th className="px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">Vencimiento</th>
+              <th className="px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wider">Estado</th>
+              <th className="px-4 py-3 font-medium text-muted-foreground text-xs uppercase tracking-wider text-right">Total</th>
             </tr>
           </thead>
           <tbody>
             {invoices?.map((inv) => (
-              <tr key={inv.id} className="border-b last:border-0 hover:bg-muted/30">
-                <td className="px-4 py-3 font-medium">{inv.invoice_number}</td>
+              <tr key={inv.id} className="border-b border-border/50 last:border-0 hover:bg-surface-2/50 transition-colors">
+                <td className="px-4 py-3 font-medium font-mono text-foreground">{inv.invoice_number}</td>
                 <td className="px-4 py-3 text-muted-foreground">{inv.issue_date}</td>
                 <td className="px-4 py-3 text-muted-foreground">{inv.due_date}</td>
-                <td className="px-4 py-3">
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[inv.status] || ''}`}>
-                    {inv.status}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-right font-medium">{inv.total}€</td>
+                <td className="px-4 py-3"><Badge variant={STATUS_VARIANT[inv.status] || 'default'} dot>{inv.status}</Badge></td>
+                <td className="px-4 py-3 text-right font-medium font-mono text-foreground">{inv.total}€</td>
               </tr>
             ))}
           </tbody>
         </table>
-      </div>
+      </GlassCard>
     </div>
   )
 }

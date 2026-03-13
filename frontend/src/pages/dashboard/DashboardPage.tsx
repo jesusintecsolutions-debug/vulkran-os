@@ -1,6 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
+import { motion } from 'framer-motion'
+import { Users, Target, FileText, ListTodo } from 'lucide-react'
+import { StatCard, GlassCard, Badge } from '@/components/ui'
 
 interface Metrics {
   timestamp: string
@@ -18,14 +21,14 @@ interface Metrics {
   tasks: { pending: number }
 }
 
-function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
-  return (
-    <div className="rounded-lg border bg-card p-5">
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <p className="mt-1 text-2xl font-bold">{value}</p>
-      {sub && <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>}
-    </div>
-  )
+const STAGE_VARIANT: Record<string, 'info' | 'neon' | 'purple' | 'warning' | 'success' | 'error' | 'default'> = {
+  new: 'info',
+  contacted: 'neon',
+  meeting: 'purple',
+  proposal: 'warning',
+  negotiation: 'warning',
+  won: 'success',
+  lost: 'error',
 }
 
 export default function DashboardPage() {
@@ -37,59 +40,45 @@ export default function DashboardPage() {
   })
 
   if (isLoading) {
-    return <div className="text-muted-foreground">Cargando métricas...</div>
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="h-8 w-8 rounded-full border-2 border-vulkran border-t-transparent animate-spin" />
+      </div>
+    )
   }
 
-  if (!metrics) {
-    return <div className="text-muted-foreground">Sin datos disponibles</div>
-  }
+  if (!metrics) return <div className="text-muted-foreground">Sin datos disponibles</div>
 
   const totalLeads = Object.values(metrics.leads.pipeline).reduce((a, b) => a + b, 0)
 
   return (
     <div className="space-y-6">
-      <div>
+      <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-2xl font-bold">Hola, {user?.name}</h1>
         <p className="text-muted-foreground">Resumen de tu negocio hoy</p>
-      </div>
+      </motion.div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label="Clientes activos"
-          value={metrics.clients.active}
-          sub={`${metrics.clients.mrr}€ MRR`}
-        />
-        <StatCard
-          label="Leads en pipeline"
-          value={totalLeads}
-          sub={`${metrics.leads.pipeline_value}€ valor`}
-        />
-        <StatCard
-          label="Contenido generado (24h)"
-          value={metrics.content.items_generated_24h}
-          sub={`${metrics.content.in_review} en revisión`}
-        />
-        <StatCard
-          label="Tareas pendientes"
-          value={metrics.tasks.pending}
-        />
+        <StatCard label="Clientes activos" value={metrics.clients.active} subtitle={`${metrics.clients.mrr}€ MRR`} icon={<Users className="h-6 w-6" />} accentColor="vulkran" delay={0} />
+        <StatCard label="Leads en pipeline" value={totalLeads} subtitle={`${metrics.leads.pipeline_value}€ valor`} icon={<Target className="h-6 w-6" />} accentColor="cyan" delay={0.1} />
+        <StatCard label="Contenido (24h)" value={metrics.content.items_generated_24h} subtitle={`${metrics.content.in_review} en revisión`} icon={<FileText className="h-6 w-6" />} accentColor="green" delay={0.2} />
+        <StatCard label="Tareas pendientes" value={metrics.tasks.pending} icon={<ListTodo className="h-6 w-6" />} accentColor="amber" delay={0.3} />
       </div>
 
-      {/* Pipeline breakdown */}
-      <div className="rounded-lg border bg-card p-5">
-        <h3 className="mb-3 font-semibold">Pipeline de ventas</h3>
-        <div className="flex flex-wrap gap-3">
+      <GlassCard>
+        <h3 className="mb-3 font-semibold text-foreground">Pipeline de ventas</h3>
+        <div className="flex flex-wrap gap-2">
           {Object.entries(metrics.leads.pipeline).map(([stage, count]) => (
-            <div key={stage} className="rounded-md bg-muted px-3 py-1.5 text-sm">
-              <span className="font-medium capitalize">{stage}</span>
-              <span className="ml-2 text-muted-foreground">{count}</span>
-            </div>
+            <Badge key={stage} variant={STAGE_VARIANT[stage] || 'default'} dot>
+              <span className="capitalize">{stage}</span>
+              <span className="ml-1 opacity-70">{count}</span>
+            </Badge>
           ))}
           {Object.keys(metrics.leads.pipeline).length === 0 && (
             <p className="text-sm text-muted-foreground">Sin leads activos</p>
           )}
         </div>
-      </div>
+      </GlassCard>
     </div>
   )
 }

@@ -164,3 +164,37 @@
 - **LLM Bridge**: `call_claude_stream()` async generator para streaming API
 - **System prompt actualizado**: capabilities completas del agente (14 áreas)
 - **Config**: añadidos `tavily_api_key`, `fal_api_key`, `gemini_api_key`, `resend_api_key`
+
+### Fase C: Frontend — Dark Theme + HoloBrain 3D + SSE Chat
+- **Tema dark completo** (`index.css`): 40+ design tokens
+  - Backgrounds: #0A0A0F (surface-0), #12121A (surface-1), #1A1A2E (surface-2), #232340 (surface-3)
+  - Brand: #8B5CF6 (vulkran), #A78BFA (vulkran-light), #6D28D9 (vulkran-dark)
+  - Neon accents: cyan (#00F0FF), pink (#FF006E), green (#00FF94), amber (#FFB800)
+  - Utilidades: glass, glass-strong, glow-sm/md/lg, text-glow, neon-border, gradient-vulkran
+  - Custom scrollbar con tema coherente
+- **Dependencias nuevas**: framer-motion, @react-three/fiber, @react-three/drei, @react-three/postprocessing, three
+- **Componentes UI** (`components/ui/`):
+  - `GlassCard`: tarjeta con glassmorphism, variantes (default, strong, neon), animación entrada
+  - `Button`: 5 variantes (primary, secondary, ghost, danger, neon), 3 tamaños
+  - `Badge`: 7 variantes (default, success, warning, error, info, neon, purple), dot indicator
+  - `Input`: campo con icono opcional, focus ring vulkran
+  - `StatCard`: tarjeta de métrica con accent line, icono, trend indicator
+- **HoloBrain 3D** (`components/HoloBrain.tsx`):
+  - Esfera distorsionada con MeshDistortMaterial + Bloom postprocessing
+  - 4 estados reactivos: idle, typing, thinking, responding (cambia color, velocidad, distorsión)
+  - Anillo de partículas orbitando (60 puntos, velocidad dinámica)
+  - Iluminación dual: point lights violeta + cyan
+- **AppLayout rediseñado**: sidebar dark con gradient avatar, active indicator animado (layoutId), ambient glow, page transitions (AnimatePresence)
+- **ChatPage con SSE streaming**:
+  - Streaming via fetch + ReadableStream (no polling)
+  - Muestra text deltas en tiempo real, tool calls con ✓, loading dots
+  - Empty state con HoloBrain 3D + quick action suggestions
+  - Burbujas de mensaje con avatares (Bot/User)
+- **Todas las páginas migradas a dark theme**:
+  - Dashboard: StatCards con accent lines + iconos + pipeline badges
+  - Login: glassmorphism card con ambient glows + Sparkles icon
+  - Clients/Leads/Accounting: tablas glass con uppercase headers, hover effects, dark badges
+  - Content: grid de GlassCards con status badges
+  - Briefing: glass-strong card + lucide icon header
+  - Settings/Files: glass cards con structured layout
+- **Build**: 0 errores TypeScript, 1.6MB JS (Three.js — code-split en Fase F), 37KB CSS
