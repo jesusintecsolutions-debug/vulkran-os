@@ -73,7 +73,7 @@ export default function AppLayout() {
       {/* Sidebar — hidden on mobile, collapsible on tablet */}
       <aside
         className={cn(
-          'fixed md:static z-50 flex w-60 flex-col border-r border-sidebar-border bg-sidebar h-full transition-transform duration-300 relative',
+          'fixed md:static md:relative z-50 flex w-60 flex-col border-r border-sidebar-border bg-sidebar h-full transition-transform duration-300',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
         )}
       >
