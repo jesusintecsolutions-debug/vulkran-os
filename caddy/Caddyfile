@@ -1,17 +1,28 @@
 :80 {
+    # Static files served directly by Caddy (fast, bypasses Python)
+    handle /files/* {
+        uri strip_prefix /files
+        root * /data
+        file_server
+    }
+
+    # API proxied to FastAPI
     handle /api/* {
         reverse_proxy api:8000
     }
 
+    # n8n admin panel
     handle /n8n/* {
         uri strip_prefix /n8n
         reverse_proxy n8n:5678
     }
 
+    # Health check
     handle /health {
-        respond "OK" 200
+        reverse_proxy api:8000
     }
 
+    # Default
     handle {
         respond "VULKRAN OS" 200
     }

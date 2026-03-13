@@ -42,3 +42,16 @@
 ### Datos iniciales
 - Admin: jesus@vulkran.es
 - Clientes: Canal YouTube (600€), Inmobiliaria García (250€), Farmacia Central (340€)
+
+### Fase 2: File Storage & Asset Management
+- **FileStorage service**: upload, download, list, delete con seguridad completa
+  - Magic bytes validation (no confía en extensión del cliente)
+  - Filename sanitization (anti path traversal)
+  - Size limits (10MB por archivo)
+  - Blocked extensions (.exe, .bat, .sh, .py, etc.)
+  - SHA-256 hash para integridad
+- **Endpoints**: POST /api/files/upload/{client_id}, GET /api/files/download/{path}, GET /api/files/list/{client_id}, DELETE /api/files/{path}, POST /api/files/init/{client_id}
+- **Caddy**: servido estático de /files/* directo desde /data (sin Python overhead)
+- **Docker Compose**: Caddy ahora monta ./data:/data:ro (read-only)
+- **Agent tool**: list_client_files — el agente puede consultar archivos de clientes
+- **Estructura por cliente**: brand/, templates/static/, templates/video/, content/, invoices/

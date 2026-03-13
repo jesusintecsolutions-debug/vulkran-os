@@ -13,6 +13,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Client, Conversation, AgentTask, Notification
+from app.services.file_storage import FileStorage
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +92,24 @@ TOOLS = [
                 },
             },
             "required": ["title"],
+        },
+    },
+    {
+        "name": "list_client_files",
+        "description": "List files stored for a client. Optionally filter by category (brand, content, templates, invoices).",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "client_id": {
+                    "type": "string",
+                    "description": "UUID of the client",
+                },
+                "category": {
+                    "type": "string",
+                    "description": "Filter by category: brand, content, templates, invoices. Leave empty for all.",
+                },
+            },
+            "required": ["client_id"],
         },
     },
     {
@@ -212,6 +231,23 @@ class ToolExecutor:
         self.db.add(notif)
         await self.db.flush()
         return {"notification_id": str(notif.id), "status": "sent"}
+
+    async def _tool_list_client_files(self, _input: dict) -> dict:
+        client_id = _input["client_id"]
+        result = await self.db.execute(
+            select(Client).where(Client.id == uuid.UUID(client_id))
+        )
+        client = result.scalar_one_or_none()
+        if not client:
+            return {"error": f"Client {client_id} not found"}
+        category = _input.get("category", "")
+        files = FileStorage.list_files(client.slug, category)
+        return {
+            "client": client.name,
+            "category": category or "all",
+            "file_count": len(files),
+            "files": files[:20],  # Limit to avoid token overflow
+        }
 
     async def _tool_get_system_status(self, _input: dict) -> dict:
         clients_count = await self.db.scalar(

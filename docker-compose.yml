@@ -7,7 +7,8 @@ services:
       - "443:443"
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile
-      - caddy_data:/data
+      - ./data:/data:ro
+      - caddy_data:/caddy_data
       - caddy_config:/config
     depends_on:
       - api
