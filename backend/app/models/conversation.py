@@ -21,7 +21,7 @@ class Conversation(Base, TimestampMixin):
         server_default=text("gen_random_uuid()"),
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
     )
     title: Mapped[str | None] = mapped_column(String(200))
     context: Mapped[dict | None] = mapped_column(JSONB, default=None)
@@ -65,11 +65,11 @@ class AgentTask(Base, TimestampMixin):
         server_default=text("gen_random_uuid()"),
     )
     conversation_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("conversations.id")
+        UUID(as_uuid=True), ForeignKey("conversations.id"), index=True
     )
     task_type: Mapped[str] = mapped_column(String(50), nullable=False)
     status: Mapped[str] = mapped_column(
-        String(30), nullable=False, default="pending"
+        String(30), nullable=False, default="pending", index=True
     )  # pending | running | awaiting_approval | approved | completed | failed
     input_data: Mapped[dict | None] = mapped_column(JSONB, default=None)
     output_data: Mapped[dict | None] = mapped_column(JSONB, default=None)
