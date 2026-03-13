@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     resend_api_key: str = ""
     email_from: str = "noreply@vulkran.es"
 
+    # Web Research
+    tavily_api_key: str = ""
+
+    # Image Generation
+    fal_api_key: str = ""
+
     # Storage
     data_dir: str = "/app/data"
 

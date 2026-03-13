@@ -134,3 +134,33 @@
 - **AppLayout**: sidebar izquierdo (w-60) con 9 items de navegación filtrados por rol, header con título dinámico + campana notificaciones, footer con avatar + logout
 - **Build**: 0 errores TypeScript, build de producción OK (352KB JS + 19KB CSS)
 - **Config**: vite.config.ts con @tailwindcss/vite, path alias @/, proxy API dev
+
+### Fase B: Backend — Agentic CEO capabilities
+- **Email service** (`app/services/email_service.py`): Resend API integration
+  - `send_email()`: envío vía Resend con headers auth, soporte recipients múltiples, tags
+  - 4 templates HTML con diseño dark VULKRAN: notification, briefing, invoice, lead intro
+- **Research service** (`app/services/research_service.py`): Tavily Search API
+  - `search_web()`: búsqueda avanzada con structured results para LLM
+  - `research_company()`: multi-query enrichment (sector + noticias)
+  - `research_topic()`: research para content briefs
+- **Image service** (`app/services/image_service.py`): FAL.ai Flux Pro
+  - `generate_image()`: generación con queue polling (hasta 2 min)
+  - `generate_brand_image()`: prompt enhanced con brand colors + style
+  - Soporta: landscape_16_9, portrait_9_16, square, square_hd
+- **8 nuevas herramientas del agente** (total: 21 tools en `agent_tools.py`):
+  - `send_email`: envía emails a leads/clientes, auto-genera outreach con lead data
+  - `research_company`: investiga empresa para lead enrichment
+  - `research_topic`: research web para content briefs
+  - `generate_image`: genera imagen AI vía FAL.ai
+  - `generate_video`: cola de render Remotion (placeholder para Fase E)
+  - `create_invoice_pdf`: crea factura con items, IVA 21%, numeración auto
+  - `schedule_content`: programa publicación de content items
+  - `propose_actions`: analiza métricas y propone acciones prioritarias
+- **SSE Streaming** (`POST /api/agent/chat/stream`):
+  - Endpoint SSE para chat en tiempo real
+  - Multi-turn tool loop con streaming de deltas de texto
+  - Events: text_delta, tool_call, tool_result, done, error
+  - Persiste mensajes y tool_calls en conversation history
+- **LLM Bridge**: `call_claude_stream()` async generator para streaming API
+- **System prompt actualizado**: capabilities completas del agente (14 áreas)
+- **Config**: añadidos `tavily_api_key`, `fal_api_key`, `gemini_api_key`, `resend_api_key`
