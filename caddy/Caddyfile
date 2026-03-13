@@ -1,0 +1,22 @@
+:80 {
+    # API
+    handle /api/* {
+        reverse_proxy api:8000
+    }
+
+    # n8n (admin only, will add auth later)
+    handle /n8n/* {
+        uri strip_prefix /n8n
+        reverse_proxy n8n:5678
+    }
+
+    # Health check
+    handle /health {
+        respond "OK" 200
+    }
+
+    # Default
+    handle {
+        respond "VULKRAN OS" 200
+    }
+}
