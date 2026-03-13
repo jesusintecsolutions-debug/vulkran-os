@@ -24,10 +24,10 @@ export default function BriefingPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-3">
-          <Newspaper className="h-6 w-6 text-vulkran-light" />
-          <h1 className="text-2xl font-bold">Briefing Diario</h1>
+          <Newspaper className="h-6 w-6 text-vulkran-light shrink-0" />
+          <h1 className="text-xl sm:text-2xl font-bold">Briefing Diario</h1>
         </div>
         {data?.generated_at && (
           <Badge variant="purple">{new Date(data.generated_at).toLocaleString('es-ES')}</Badge>

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/api/client'
 import { GlassCard, Badge } from '@/components/ui'
+import { Receipt } from 'lucide-react'
 
 interface Invoice {
   id: string
@@ -30,9 +31,33 @@ export default function AccountingPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold">Contabilidad</h1>
+      <div className="flex items-center gap-3">
+        <Receipt className="h-6 w-6 text-vulkran-light" />
+        <h1 className="text-xl sm:text-2xl font-bold">Contabilidad</h1>
+      </div>
 
-      <GlassCard hover={false} className="overflow-hidden !p-0">
+      {/* Mobile: card view */}
+      <div className="space-y-3 md:hidden">
+        {invoices?.map((inv) => (
+          <GlassCard key={inv.id} className="!p-4">
+            <div className="flex items-start justify-between mb-2">
+              <div>
+                <p className="font-medium font-mono text-foreground">{inv.invoice_number}</p>
+                <p className="text-xs text-muted-foreground">{inv.issue_date}</p>
+              </div>
+              <Badge variant={STATUS_VARIANT[inv.status] || 'default'} dot>{inv.status}</Badge>
+            </div>
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Vence: {inv.due_date}</span>
+              <span className="font-mono text-foreground font-medium text-sm">{inv.total}€</span>
+            </div>
+          </GlassCard>
+        ))}
+        {invoices?.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">Sin facturas</p>}
+      </div>
+
+      {/* Desktop: table view */}
+      <GlassCard hover={false} className="overflow-hidden !p-0 hidden md:block">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border text-left">

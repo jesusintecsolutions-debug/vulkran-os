@@ -30,7 +30,7 @@ export default function ContentPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold">Contenido</h1>
+      <h1 className="text-xl sm:text-2xl font-bold">Contenido</h1>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {batches?.map((b) => (

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/api/client'
 import { GlassCard, Badge } from '@/components/ui'
+import { Users } from 'lucide-react'
 
 interface Client {
   id: string
@@ -22,12 +23,36 @@ export default function ClientsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Clientes</h1>
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-3">
+          <Users className="h-6 w-6 text-vulkran-light" />
+          <h1 className="text-xl sm:text-2xl font-bold">Clientes</h1>
+        </div>
         <Badge variant="purple" dot>{clients?.length || 0} activos</Badge>
       </div>
 
-      <GlassCard hover={false} className="overflow-hidden !p-0">
+      {/* Mobile: card view */}
+      <div className="space-y-3 md:hidden">
+        {clients?.map((c) => (
+          <GlassCard key={c.id} className="!p-4">
+            <div className="flex items-start justify-between mb-2">
+              <div className="min-w-0 flex-1 mr-2">
+                <p className="font-medium text-foreground truncate">{c.name}</p>
+                <p className="text-xs text-muted-foreground">{c.sector}</p>
+              </div>
+              <Badge variant="success" dot>{c.status}</Badge>
+            </div>
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span className="truncate mr-2">{c.contact_email || '—'}</span>
+              <span className="font-mono text-foreground font-medium shrink-0">{c.monthly_fee ? `${c.monthly_fee}€/mes` : '—'}</span>
+            </div>
+          </GlassCard>
+        ))}
+        {clients?.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">Sin clientes activos</p>}
+      </div>
+
+      {/* Desktop: table view */}
+      <GlassCard hover={false} className="overflow-hidden !p-0 hidden md:block">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border text-left">

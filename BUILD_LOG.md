@@ -212,6 +212,19 @@
 - **ChatPage**: márgenes responsivos -m-4 md:-m-6
 - **HTML**: título "VULKRAN OS", theme-color dark
 
+### Fase D-fix: Responsive Deep Review
+- **ClientsPage**: añadida vista de cards para móvil (md:hidden) + tabla solo desktop (hidden md:block)
+  - Card muestra: nombre, sector, email, cuota/mes, estado badge
+  - Texto truncado con min-w-0 para evitar desbordamiento
+- **AccountingPage**: añadida vista de cards para móvil + tabla solo desktop
+  - Card muestra: nº factura, fecha, vencimiento, estado badge, total
+- **LeadsPage**: ya tenía card view, ajustado h1 text-xl sm:text-2xl
+- **BriefingPage**: header con flex-wrap + shrink-0 en icono para evitar overflow en móvil
+- **SettingsPage**: grid profile cambiado a grid-cols-1 sm:grid-cols-2
+- **ChatPage**: altura ajustada para compensar bottom nav en móvil (h-[calc(100vh-3.5rem-5rem)])
+- **Todas las páginas**: h1 responsive (text-xl en móvil, sm:text-2xl en desktop)
+- **Patrón consistente**: todas las tablas usan card view en móvil + table en desktop
+
 ### Fase E: Code Splitting & Performance
 - **Lazy loading**: 8 páginas con `React.lazy()` + `Suspense` (solo Dashboard eagerly loaded)
 - **Code splitting**: Three.js/HoloBrain solo se carga al acceder a ChatPage

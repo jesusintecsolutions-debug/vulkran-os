@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/api/client'
 import { GlassCard, Badge } from '@/components/ui'
+import { Target } from 'lucide-react'
 
 interface Lead {
   id: string
@@ -33,9 +34,33 @@ export default function LeadsPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold">Pipeline de Leads</h1>
+      <div className="flex items-center gap-3">
+        <Target className="h-6 w-6 text-vulkran-light" />
+        <h1 className="text-xl sm:text-2xl font-bold">Pipeline de Leads</h1>
+      </div>
 
-      <GlassCard hover={false} className="overflow-hidden !p-0">
+      {/* Mobile: card view */}
+      <div className="space-y-3 md:hidden">
+        {leads?.map((l) => (
+          <GlassCard key={l.id} className="!p-4">
+            <div className="flex items-start justify-between mb-2">
+              <div>
+                <p className="font-medium text-foreground">{l.name}</p>
+                <p className="text-xs text-muted-foreground">{l.company || 'Sin empresa'}</p>
+              </div>
+              <Badge variant={STAGE_VARIANT[l.stage] || 'default'} dot>{l.stage}</Badge>
+            </div>
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span className="capitalize">{l.source || '—'}</span>
+              <span className="font-mono text-foreground font-medium">{l.estimated_value ? `${l.estimated_value}€` : '—'}</span>
+            </div>
+          </GlassCard>
+        ))}
+        {leads?.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">Sin leads activos</p>}
+      </div>
+
+      {/* Desktop: table view */}
+      <GlassCard hover={false} className="overflow-hidden !p-0 hidden md:block">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border text-left">

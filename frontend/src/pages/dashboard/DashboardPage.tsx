@@ -54,7 +54,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-2xl font-bold">Hola, {user?.name}</h1>
+        <h1 className="text-xl sm:text-2xl font-bold">Hola, {user?.name}</h1>
         <p className="text-muted-foreground">Resumen de tu negocio hoy</p>
       </motion.div>
 

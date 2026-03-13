@@ -9,12 +9,12 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <Settings className="h-6 w-6 text-vulkran-light" />
-        <h1 className="text-2xl font-bold">Ajustes</h1>
+        <h1 className="text-xl sm:text-2xl font-bold">Ajustes</h1>
       </div>
 
       <GlassCard className="max-w-lg">
         <h2 className="mb-4 text-lg font-semibold text-foreground">Perfil</h2>
-        <dl className="grid grid-cols-2 gap-4 text-sm">
+        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
           <div>
             <dt className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Nombre</dt>
             <dd className="font-medium text-foreground">{user?.name || '—'}</dd>
