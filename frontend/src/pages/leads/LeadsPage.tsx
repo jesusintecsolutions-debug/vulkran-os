@@ -42,17 +42,17 @@ export default function LeadsPage() {
       {/* Mobile: card view */}
       <div className="space-y-3 md:hidden">
         {leads?.map((l) => (
-          <GlassCard key={l.id} className="!p-4">
-            <div className="flex items-start justify-between mb-2">
-              <div>
-                <p className="font-medium text-foreground">{l.name}</p>
-                <p className="text-xs text-muted-foreground">{l.company || 'Sin empresa'}</p>
+          <GlassCard key={l.id} className="!p-4 overflow-hidden">
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <div className="min-w-0 flex-1">
+                <p className="font-medium text-foreground truncate">{l.name}</p>
+                <p className="text-xs text-muted-foreground truncate">{l.company || 'Sin empresa'}</p>
               </div>
-              <Badge variant={STAGE_VARIANT[l.stage] || 'default'} dot>{l.stage}</Badge>
+              <Badge variant={STAGE_VARIANT[l.stage] || 'default'} dot className="shrink-0">{l.stage}</Badge>
             </div>
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span className="capitalize">{l.source || '—'}</span>
-              <span className="font-mono text-foreground font-medium">{l.estimated_value ? `${l.estimated_value}€` : '—'}</span>
+              <span className="capitalize truncate mr-2">{l.source || '—'}</span>
+              <span className="font-mono text-foreground font-medium shrink-0">{l.estimated_value ? `${l.estimated_value}€` : '—'}</span>
             </div>
           </GlassCard>
         ))}

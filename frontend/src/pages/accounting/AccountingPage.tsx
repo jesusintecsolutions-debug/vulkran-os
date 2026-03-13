@@ -39,13 +39,13 @@ export default function AccountingPage() {
       {/* Mobile: card view */}
       <div className="space-y-3 md:hidden">
         {invoices?.map((inv) => (
-          <GlassCard key={inv.id} className="!p-4">
-            <div className="flex items-start justify-between mb-2">
-              <div>
-                <p className="font-medium font-mono text-foreground">{inv.invoice_number}</p>
+          <GlassCard key={inv.id} className="!p-4 overflow-hidden">
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <div className="min-w-0 flex-1">
+                <p className="font-medium font-mono text-foreground truncate">{inv.invoice_number}</p>
                 <p className="text-xs text-muted-foreground">{inv.issue_date}</p>
               </div>
-              <Badge variant={STATUS_VARIANT[inv.status] || 'default'} dot>{inv.status}</Badge>
+              <Badge variant={STATUS_VARIANT[inv.status] || 'default'} dot className="shrink-0">{inv.status}</Badge>
             </div>
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>Vence: {inv.due_date}</span>
