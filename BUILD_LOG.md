@@ -198,3 +198,16 @@
   - Briefing: glass-strong card + lucide icon header
   - Settings/Files: glass cards con structured layout
 - **Build**: 0 errores TypeScript, 1.6MB JS (Three.js — code-split en Fase F), 37KB CSS
+
+### Fase D: Responsive & Mobile Experience
+- **AppLayout responsive**:
+  - Desktop: sidebar fijo 240px + content area
+  - Tablet (md): sidebar fijo con padding adaptado
+  - Mobile (<md): sidebar oculto, hamburger menu + overlay animado (AnimatePresence)
+  - Bottom nav mobile: 5 items (Dashboard, Contenido, Leads, AI, Ajustes) con glass-strong
+  - Sidebar se cierra automáticamente al navegar en móvil
+- **Bottom nav**: safe-area-bottom para iPhone notch, iconos + label 10px
+- **PWA meta tags**: viewport-fit=cover, theme-color #0A0A0F, apple-mobile-web-app-capable
+- **Content padding**: p-4 móvil, p-6 desktop, pb-20 móvil (espacio para bottom nav)
+- **ChatPage**: márgenes responsivos -m-4 md:-m-6
+- **HTML**: título "VULKRAN OS", theme-color dark
