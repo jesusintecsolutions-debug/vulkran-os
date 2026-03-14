@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { Plus, X, Image, Palette } from 'lucide-react'
 
 interface SlotDef {
