@@ -3,7 +3,7 @@
 api.vulkran.com {
     handle /files/* {
         uri strip_prefix /files
-        root * /data
+        root * /srv/files
         file_server
     }
 
