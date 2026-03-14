@@ -1,7 +1,6 @@
 import { useRef, useMemo, Suspense } from 'react'
 import { Canvas, useFrame, useLoader } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
-import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { MeshSurfaceSampler } from 'three/examples/jsm/math/MeshSurfaceSampler.js'
@@ -79,8 +78,8 @@ function hash(i: number, seed: number): number {
 }
 
 /* ─── Constants ─── */
-const SURFACE_PARTICLES = 45000
-const INNER_PARTICLES = 5000
+const SURFACE_PARTICLES = 12000
+const INNER_PARTICLES = 1500
 const TOTAL = SURFACE_PARTICLES + INNER_PARTICLES
 
 /* ─── Brain particle cloud from real mesh ─── */
@@ -397,9 +396,6 @@ function BrainLoading() {
 function BrainScene({ state, onClick }: { state: BrainState; onClick?: () => void }) {
   return (
     <>
-      <ambientLight intensity={0.02} />
-      <pointLight position={[2, 3, 2]} intensity={0.15} color="#00F0FF" />
-      <pointLight position={[-2, -1, 3]} intensity={0.08} color="#006688" />
       <Suspense fallback={<BrainLoading />}>
         <BrainCloud state={state} />
       </Suspense>
@@ -415,13 +411,6 @@ function BrainScene({ state, onClick }: { state: BrainState; onClick?: () => voi
         minPolarAngle={Math.PI * 0.15}
         maxPolarAngle={Math.PI * 0.85}
       />
-      <EffectComposer>
-        <Bloom
-          luminanceThreshold={0.05}
-          luminanceSmoothing={0.9}
-          intensity={state === 'thinking' ? 3.0 : state === 'responding' ? 2.0 : 1.2}
-        />
-      </EffectComposer>
     </>
   )
 }
@@ -439,7 +428,8 @@ export function HoloBrain({ state = 'idle', size = 'md', className, onClick }: H
     <div className={`${sizeMap[size]} ${className || ''} cursor-pointer overflow-hidden`}>
       <Canvas
         camera={{ position: [0, 0.15, 3.5], fov: 34 }}
-        gl={{ alpha: true, antialias: true }}
+        dpr={[1, 1.5]}
+        gl={{ alpha: true, antialias: false, powerPreference: 'high-performance' }}
         style={{ background: 'transparent' }}
       >
         <BrainScene state={state} onClick={onClick} />
