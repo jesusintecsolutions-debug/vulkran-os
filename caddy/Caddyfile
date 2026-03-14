@@ -1,49 +1,15 @@
-# VULKRAN OS — Caddy reverse proxy
-# When domain is ready, replace :80 block with the domain blocks below.
+# VULKRAN OS — Caddy reverse proxy (HTTPS via Let's Encrypt)
 
-# === TEMPORARY: IP-only access (HTTP) ===
-:80 {
-    # Static files
+api.vulkran.com {
     handle /files/* {
         uri strip_prefix /files
         root * /data
         file_server
     }
 
-    # API
-    handle /api/* {
-        reverse_proxy api:8000
-    }
-
-    # n8n
-    handle /n8n/* {
-        uri strip_prefix /n8n
-        reverse_proxy n8n:5678
-    }
-
-    # Health
-    handle /health {
-        reverse_proxy api:8000
-    }
-
-    handle {
-        respond "VULKRAN OS" 200
-    }
+    reverse_proxy api:8000
 }
 
-# === DOMAIN CONFIG (uncomment when vulkran-os.com DNS is ready) ===
-# Delete the :80 block above and uncomment these:
-#
-# api.vulkran-os.com {
-#     handle /files/* {
-#         uri strip_prefix /files
-#         root * /data
-#         file_server
-#     }
-#
-#     reverse_proxy api:8000
-# }
-#
-# n8n.vulkran-os.com {
-#     reverse_proxy n8n:5678
-# }
+n8n.vulkran.com {
+    reverse_proxy n8n:5678
+}

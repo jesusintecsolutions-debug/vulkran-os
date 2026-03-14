@@ -34,7 +34,7 @@ class Settings(BaseSettings):
 
     # Email
     resend_api_key: str = ""
-    email_from: str = "noreply@vulkran.es"
+    email_from: str = "noreply@vulkran.com"
 
     # Web Research
     tavily_api_key: str = ""
@@ -56,7 +56,12 @@ class Settings(BaseSettings):
     data_dir: str = "/app/data"
 
     # CORS
-    cors_origins: list[str] = ["*"]
+    cors_origins: list[str] = [
+        "https://vulkran.com",
+        "https://www.vulkran.com",
+        "https://vulkran-os.vercel.app",
+        "http://localhost:5173",
+    ]
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 
