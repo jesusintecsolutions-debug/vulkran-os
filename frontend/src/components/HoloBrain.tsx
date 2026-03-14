@@ -1,4 +1,4 @@
-import { useRef, useMemo, useCallback } from 'react'
+import { useRef, useMemo } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
@@ -288,8 +288,36 @@ function AmbientParticles() {
   )
 }
 
+/* ─── Invisible click target sphere ─── */
+function ClickTarget({ onClick }: { onClick?: () => void }) {
+  const pointerDown = useRef<{ x: number; y: number; time: number } | null>(null)
+
+  return (
+    <mesh
+      visible={false}
+      onPointerDown={(e) => {
+        pointerDown.current = { x: e.clientX, y: e.clientY, time: Date.now() }
+      }}
+      onPointerUp={(e) => {
+        if (!pointerDown.current || !onClick) return
+        const dx = e.clientX - pointerDown.current.x
+        const dy = e.clientY - pointerDown.current.y
+        const dt = Date.now() - pointerDown.current.time
+        // Only fire click if pointer barely moved and was quick (not a drag)
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8 && dt < 400) {
+          onClick()
+        }
+        pointerDown.current = null
+      }}
+    >
+      <sphereGeometry args={[1.2, 16, 16]} />
+      <meshBasicMaterial transparent opacity={0} />
+    </mesh>
+  )
+}
+
 /* ─── Scene ─── */
-function BrainScene({ state }: { state: BrainState }) {
+function BrainScene({ state, onClick }: { state: BrainState; onClick?: () => void }) {
   return (
     <>
       <ambientLight intensity={0.05} />
@@ -298,6 +326,7 @@ function BrainScene({ state }: { state: BrainState }) {
       <BrainCloud state={state} />
       <ScanRing state={state} />
       <AmbientParticles />
+      <ClickTarget onClick={onClick} />
       <OrbitControls
         enableZoom={false}
         enablePan={false}
@@ -327,16 +356,14 @@ export function HoloBrain({ state = 'idle', size = 'md', className, onClick }: H
     xl: 'h-[22rem] w-[22rem] md:h-[26rem] md:w-[26rem]',
   }
 
-  const handleClick = useCallback(() => onClick?.(), [onClick])
-
   return (
-    <div className={`${sizeMap[size]} ${className || ''} cursor-pointer`} onClick={handleClick}>
+    <div className={`${sizeMap[size]} ${className || ''} cursor-pointer`}>
       <Canvas
         camera={{ position: [0, 0.1, 2.8], fov: 40 }}
         gl={{ alpha: true, antialias: true }}
         style={{ background: 'transparent' }}
       >
-        <BrainScene state={state} />
+        <BrainScene state={state} onClick={onClick} />
       </Canvas>
     </div>
   )
