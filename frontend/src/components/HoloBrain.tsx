@@ -1,8 +1,10 @@
-import { useRef, useMemo } from 'react'
-import { Canvas, useFrame } from '@react-three/fiber'
+import { useRef, useMemo, useState, useEffect, Suspense } from 'react'
+import { Canvas, useFrame, useLoader } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import * as THREE from 'three'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { MeshSurfaceSampler } from 'three/examples/jsm/math/MeshSurfaceSampler.js'
 
 export type BrainState = 'idle' | 'typing' | 'thinking' | 'responding' | 'activating'
 
@@ -13,201 +15,238 @@ interface HoloBrainProps {
   onClick?: () => void
 }
 
+/* ─── Custom holographic shader ─── */
+const holoVertexShader = /* glsl */ `
+  attribute float aSize;
+  attribute float aPhase;
+  attribute float aDepth;
+  attribute vec3 aColor;
+
+  varying vec3 vColor;
+  varying float vDepth;
+  varying float vPhase;
+
+  uniform float uTime;
+  uniform float uPulseSpeed;
+  uniform float uPulseAmp;
+
+  void main() {
+    vColor = aColor;
+    vDepth = aDepth;
+    vPhase = aPhase;
+
+    // Pulsing size
+    float pulse = sin(uTime * uPulseSpeed + aPhase) * uPulseAmp;
+    float size = aSize + pulse;
+
+    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+    gl_PointSize = size * (300.0 / -mvPosition.z);
+    gl_Position = projectionMatrix * mvPosition;
+  }
+`
+
+const holoFragmentShader = /* glsl */ `
+  varying vec3 vColor;
+  varying float vDepth;
+  varying float vPhase;
+
+  uniform float uTime;
+  uniform float uOpacity;
+
+  void main() {
+    // Soft circular point
+    float dist = length(gl_PointCoord - vec2(0.5));
+    if (dist > 0.5) discard;
+
+    // Soft radial falloff — gaussian-ish
+    float alpha = 1.0 - smoothstep(0.0, 0.5, dist);
+    alpha *= alpha; // sharper falloff for more defined points
+
+    // Slight shimmer based on depth
+    float shimmer = 0.85 + 0.15 * sin(uTime * 2.0 + vPhase * 6.28);
+
+    // Inner particles glow more
+    float glow = vDepth > 0.3 ? 1.4 : 1.0;
+
+    gl_FragColor = vec4(vColor * shimmer * glow, alpha * uOpacity);
+  }
+`
+
 /* ─── Deterministic pseudo-random ─── */
 function hash(i: number, seed: number): number {
   const t = Math.sin(i * 127.1 + seed * 311.7) * 43758.5453
   return t - Math.floor(t)
 }
 
-/* ─── Brain surface point: returns [x, y, z] on an anatomical brain shape ─── */
-function brainSurfacePoint(
-  theta: number,
-  phi: number,
-  radiusJitter: number,
-): [number, number, number] {
-  // Base sphere
-  const sx = Math.sin(phi) * Math.cos(theta)
-  const sy = Math.sin(phi) * Math.sin(theta)
-  const sz = Math.cos(phi)
+/* ─── Constants ─── */
+const SURFACE_PARTICLES = 45000
+const INNER_PARTICLES = 5000
+const TOTAL = SURFACE_PARTICLES + INNER_PARTICLES
 
-  // Scale to brain proportions: wider (X), shorter (Y), elongated (Z)
-  let x = sx * 0.85
-  let y = sy * 0.68
-  let z = sz * 0.95
-
-  // Frontal lobe bulge
-  if (z > 0.15) {
-    const f = Math.pow((z - 0.15) / 0.8, 1.5) * 0.18
-    x *= 1.0 + f
-    y *= 1.0 + f * 0.6
-  }
-
-  // Temporal lobe widening (sides, lower half)
-  if (y < 0.15 && y > -0.45) {
-    const t = Math.max(0, 1.0 - Math.abs(y + 0.15) / 0.3) * 0.18
-    x *= 1.0 + t
-  }
-
-  // Occipital lobe (back)
-  if (z < -0.25) {
-    const o = Math.pow((-z - 0.25) / 0.7, 1.5) * 0.1
-    y *= 1.0 + o
-  }
-
-  // Parietal widening (top)
-  if (y > 0.1) {
-    x *= 1.0 + y * 0.12
-    z *= 1.0 + y * 0.06
-  }
-
-  // Flatten bottom
-  if (y < -0.5) y = -0.5 - (y + 0.5) * 0.15
-
-  // Longitudinal fissure — subtle groove, not a gap
-  const fissureWidth = y > 0 ? 0.02 + y * 0.015 : 0.008
-  if (Math.abs(x) < fissureWidth) {
-    x += (x >= 0 ? 1 : -1) * (fissureWidth - Math.abs(x) + 0.005)
-  }
-
-  // Sulci/gyri surface detail
-  const s1 = Math.sin(x * 7 + z * 9) * 0.022
-  const s2 = Math.sin(y * 13 + x * 11) * 0.015
-  const s3 = Math.cos(z * 8 + y * 7) * 0.018
-  const sulci = s1 + s2 + s3
-
-  const len = Math.sqrt(x * x + y * y + z * z) || 1
-  const nx = x / len, ny = y / len, nz = z / len
-  x += nx * (sulci + radiusJitter)
-  y += ny * (sulci + radiusJitter) * 0.7
-  z += nz * (sulci + radiusJitter)
-
-  return [x, y, z]
-}
-
-/* ─── Generate dense brain particles ─── */
-const SURFACE_COUNT = 3500
-const INNER_COUNT = 800
-const TOTAL = SURFACE_COUNT + INNER_COUNT
-
-function generateBrainCloud(): { positions: Float32Array; depths: Float32Array } {
-  const positions = new Float32Array(TOTAL * 3)
-  const depths = new Float32Array(TOTAL) // 0=surface, 1=deep interior
-
-  // Surface particles — dense shell
-  for (let i = 0; i < SURFACE_COUNT; i++) {
-    const theta = hash(i, 1) * Math.PI * 2
-    const phi = Math.acos(2 * hash(i, 2) - 1)
-    const jitter = (hash(i, 3) - 0.5) * 0.035
-
-    const [x, y, z] = brainSurfacePoint(theta, phi, jitter)
-    positions[i * 3] = x
-    positions[i * 3 + 1] = y
-    positions[i * 3 + 2] = z
-    depths[i] = 0
-  }
-
-  // Inner volume particles — sparser, for depth/glow
-  for (let i = 0; i < INNER_COUNT; i++) {
-    const idx = SURFACE_COUNT + i
-    const theta = hash(i, 10) * Math.PI * 2
-    const phi = Math.acos(2 * hash(i, 11) - 1)
-    const shrink = 0.3 + hash(i, 12) * 0.5 // 30%-80% of surface radius
-    const jitter = (hash(i, 13) - 0.5) * 0.02
-
-    const [sx, sy, sz] = brainSurfacePoint(theta, phi, jitter)
-    positions[idx * 3] = sx * shrink
-    positions[idx * 3 + 1] = sy * shrink
-    positions[idx * 3 + 2] = sz * shrink
-    depths[idx] = 1.0 - shrink
-  }
-
-  return { positions, depths }
-}
-
-/* ─── Brain particle cloud ─── */
+/* ─── Brain particle cloud from real mesh ─── */
 function BrainCloud({ state }: { state: BrainState }) {
   const pointsRef = useRef<THREE.Points>(null)
+  const gltf = useLoader(GLTFLoader, '/models/brain.glb')
 
-  const { positions, colors, baseSizes, phases } = useMemo(() => {
-    const { positions: pos, depths } = generateBrainCloud()
+  const { geometry, material } = useMemo(() => {
+    // Find the brain mesh in the loaded model
+    let brainMesh: THREE.Mesh | null = null
+    gltf.scene.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh && !brainMesh) {
+        brainMesh = child as THREE.Mesh
+      }
+    })
 
-    // Color gradient: surface = bright cyan, interior = deeper teal/blue
-    const col = new Float32Array(TOTAL * 3)
-    const sz = new Float32Array(TOTAL)
-    const ph = new Float32Array(TOTAL)
+    if (!brainMesh) {
+      throw new Error('No mesh found in brain model')
+    }
+
+    // Normalize the mesh: center it and scale to unit size
+    const mesh = brainMesh as THREE.Mesh
+    const geo = mesh.geometry.clone()
+
+    // Compute bounding box for normalization
+    geo.computeBoundingBox()
+    const box = geo.boundingBox!
+    const center = new THREE.Vector3()
+    box.getCenter(center)
+    const size = new THREE.Vector3()
+    box.getSize(size)
+    const maxDim = Math.max(size.x, size.y, size.z)
+    const scale = 1.6 / maxDim // Normalize to ~1.6 units across (fits within container)
+
+    // Apply centering + scaling to geometry
+    geo.translate(-center.x, -center.y, -center.z)
+    geo.scale(scale, scale, scale)
+
+    // Ensure we have normals for sampling
+    geo.computeVertexNormals()
+
+    // Build sampler
+    const samplerMesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial())
+    const sampler = new MeshSurfaceSampler(samplerMesh).build()
+
+    // Sample particles
+    const positions = new Float32Array(TOTAL * 3)
+    const colors = new Float32Array(TOTAL * 3)
+    const sizes = new Float32Array(TOTAL)
+    const phases = new Float32Array(TOTAL)
+    const depths = new Float32Array(TOTAL)
+
+    const tempPos = new THREE.Vector3()
+    const tempNormal = new THREE.Vector3()
+
+    // Surface particles — dense shell
+    for (let i = 0; i < SURFACE_PARTICLES; i++) {
+      sampler.sample(tempPos, tempNormal)
+
+      // Slight outward jitter along normal for volume
+      const jitter = (hash(i, 3) - 0.5) * 0.02
+      positions[i * 3] = tempPos.x + tempNormal.x * jitter
+      positions[i * 3 + 1] = tempPos.y + tempNormal.y * jitter
+      positions[i * 3 + 2] = tempPos.z + tempNormal.z * jitter
+      depths[i] = 0
+    }
+
+    // Inner volume particles — sparser, for core glow
+    for (let i = 0; i < INNER_PARTICLES; i++) {
+      const idx = SURFACE_PARTICLES + i
+      sampler.sample(tempPos)
+
+      const shrink = 0.2 + hash(i, 12) * 0.55 // 20%-75% depth
+      positions[idx * 3] = tempPos.x * shrink
+      positions[idx * 3 + 1] = tempPos.y * shrink
+      positions[idx * 3 + 2] = tempPos.z * shrink
+      depths[idx] = 1.0 - shrink
+    }
+
+    // Compute color & size for each particle
+    // Get bounding box of sampled positions
+    let minY = Infinity, maxY = -Infinity
+    for (let i = 0; i < TOTAL; i++) {
+      const y = positions[i * 3 + 1]
+      if (y < minY) minY = y
+      if (y > maxY) maxY = y
+    }
+    const rangeY = maxY - minY || 1
 
     for (let i = 0; i < TOTAL; i++) {
       const d = depths[i]
-      const y = pos[i * 3 + 1]
-      const x = pos[i * 3]
+      const y = positions[i * 3 + 1]
+      const x = positions[i * 3]
 
-      // Height-based color variation: top = cyan, bottom = teal
-      const heightFactor = (y + 0.7) / 1.4 // 0 at bottom, 1 at top
-      const sideFactor = Math.abs(x) / 0.9 // 0 at center, 1 at sides
+      // Normalized height (0=bottom, 1=top)
+      const hf = (y - minY) / rangeY
 
-      // RGB: mix between cyan (#00F0FF) and teal (#008090) based on height + depth
-      const r = d > 0.3 ? 0.0 : 0.0 + sideFactor * 0.05
-      const g = d > 0.3
-        ? 0.3 + heightFactor * 0.3
-        : 0.7 + heightFactor * 0.25 + sideFactor * 0.05
-      const b = d > 0.3
-        ? 0.4 + heightFactor * 0.2
-        : 0.85 + heightFactor * 0.15
+      // Cyan core (#00F0FF) → teal edge (#006080) with height variation
+      if (d > 0.3) {
+        // Inner particles: deep blue/teal, brighter
+        colors[i * 3] = 0.0
+        colors[i * 3 + 1] = 0.5 + hf * 0.4
+        colors[i * 3 + 2] = 0.7 + hf * 0.3
+      } else {
+        // Surface particles: cyan with subtle variation
+        const side = Math.abs(x) * 0.3
+        colors[i * 3] = 0.0 + side * 0.05
+        colors[i * 3 + 1] = 0.75 + hf * 0.2
+        colors[i * 3 + 2] = 0.9 + hf * 0.1
+      }
 
-      col[i * 3] = r
-      col[i * 3 + 1] = g
-      col[i * 3 + 2] = b
+      // Size: surface = tiny dense points, inner = slightly larger glow dots
+      sizes[i] = d > 0.3
+        ? 2.5 + hash(i, 30) * 3.5  // inner
+        : 1.0 + hash(i, 30) * 2.0  // surface
 
-      // Size: surface = small dense, interior = larger glow
-      sz[i] = d > 0.3
-        ? 0.015 + hash(i, 30) * 0.02 // inner: larger
-        : 0.006 + hash(i, 30) * 0.012 // surface: small and dense
-      ph[i] = hash(i, 40) * Math.PI * 2
+      phases[i] = hash(i, 40) * Math.PI * 2
     }
 
-    return { positions: pos, colors: col, baseSizes: sz, phases: ph }
-  }, [])
+    // Build buffer geometry
+    const bufGeo = new THREE.BufferGeometry()
+    bufGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+    bufGeo.setAttribute('aColor', new THREE.BufferAttribute(colors, 3))
+    bufGeo.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1))
+    bufGeo.setAttribute('aPhase', new THREE.BufferAttribute(phases, 1))
+    bufGeo.setAttribute('aDepth', new THREE.BufferAttribute(depths, 1))
 
-  const liveSizes = useMemo(() => new Float32Array(baseSizes), [baseSizes])
+    // Shader material
+    const mat = new THREE.ShaderMaterial({
+      vertexShader: holoVertexShader,
+      fragmentShader: holoFragmentShader,
+      uniforms: {
+        uTime: { value: 0 },
+        uPulseSpeed: { value: 1.2 },
+        uPulseAmp: { value: 0.3 },
+        uOpacity: { value: 0.85 },
+      },
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    })
+
+    return { geometry: bufGeo, material: mat }
+  }, [gltf])
 
   useFrame(({ clock }) => {
     if (!pointsRef.current) return
     const t = clock.getElapsedTime()
-    const geo = pointsRef.current.geometry
-    const sizeAttr = geo.getAttribute('size') as THREE.BufferAttribute
+    const mat = pointsRef.current.material as THREE.ShaderMaterial
 
-    const pulseSpeed = state === 'thinking' ? 5 : state === 'responding' ? 3 : 1.2
-    const pulseAmp = state === 'thinking' ? 0.008 : state === 'responding' ? 0.005 : 0.002
+    // State-driven parameters
+    const isThinking = state === 'thinking'
+    const isResponding = state === 'responding'
+    const isIdle = state === 'idle'
 
-    for (let i = 0; i < TOTAL; i++) {
-      liveSizes[i] = baseSizes[i] + Math.sin(t * pulseSpeed + phases[i]) * pulseAmp
-    }
-    sizeAttr.array = liveSizes
-    sizeAttr.needsUpdate = true
+    mat.uniforms.uTime.value = t
+    mat.uniforms.uPulseSpeed.value = isThinking ? 5.0 : isResponding ? 3.0 : 1.2
+    mat.uniforms.uPulseAmp.value = isThinking ? 1.0 : isResponding ? 0.6 : 0.3
+    mat.uniforms.uOpacity.value = isIdle ? 0.8 : 0.95
 
-    // Slow auto-rotation (only when not dragging — OrbitControls handles drag)
-    const autoSpeed = state === 'thinking' ? 0.08 : state === 'responding' ? 0.05 : 0.015
+    // Slow auto-rotation
+    const autoSpeed = isThinking ? 0.08 : isResponding ? 0.05 : 0.012
     pointsRef.current.rotation.y += autoSpeed * 0.016
   })
 
-  return (
-    <points ref={pointsRef}>
-      <bufferGeometry>
-        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
-        <bufferAttribute attach="attributes-color" args={[colors, 3]} />
-        <bufferAttribute attach="attributes-size" args={[new Float32Array(baseSizes), 1]} />
-      </bufferGeometry>
-      <pointsMaterial
-        size={0.018}
-        vertexColors
-        transparent
-        opacity={state === 'idle' ? 0.75 : 0.95}
-        sizeAttenuation
-        blending={THREE.AdditiveBlending}
-        depthWrite={false}
-      />
-    </points>
-  )
+  return <points ref={pointsRef} geometry={geometry} material={material} />
 }
 
 /* ─── Scan line — thin glowing ring ─── */
@@ -219,9 +258,9 @@ function ScanRing({ state }: { state: BrainState }) {
     const arr = new Float32Array(segments * 3)
     for (let i = 0; i < segments; i++) {
       const angle = (i / segments) * Math.PI * 2
-      arr[i * 3] = Math.cos(angle) * 0.82
+      arr[i * 3] = Math.cos(angle) * 1.05
       arr[i * 3 + 1] = 0
-      arr[i * 3 + 2] = Math.sin(angle) * 0.78
+      arr[i * 3 + 2] = Math.sin(angle) * 1.05
     }
     return arr
   }, [])
@@ -230,10 +269,10 @@ function ScanRing({ state }: { state: BrainState }) {
     if (!ringRef.current) return
     const t = clock.getElapsedTime()
     const speed = state === 'thinking' ? 1.8 : 0.5
-    ringRef.current.position.y = Math.sin(t * speed) * 0.6
+    ringRef.current.position.y = Math.sin(t * speed) * 0.8
 
     const mat = ringRef.current.material as THREE.LineBasicMaterial
-    mat.opacity = state === 'idle' ? 0.04 : state === 'thinking' ? 0.2 : 0.1
+    mat.opacity = state === 'idle' ? 0.03 : state === 'thinking' ? 0.15 : 0.08
   })
 
   return (
@@ -244,7 +283,7 @@ function ScanRing({ state }: { state: BrainState }) {
       <lineBasicMaterial
         color="#00F0FF"
         transparent
-        opacity={0.08}
+        opacity={0.05}
         blending={THREE.AdditiveBlending}
         depthWrite={false}
       />
@@ -257,17 +296,18 @@ function AmbientParticles() {
   const ref = useRef<THREE.Points>(null)
 
   const positions = useMemo(() => {
-    const arr = new Float32Array(60 * 3)
-    for (let i = 0; i < 60; i++) {
-      arr[i * 3] = (hash(i, 50) - 0.5) * 5
-      arr[i * 3 + 1] = (hash(i, 51) - 0.5) * 5
-      arr[i * 3 + 2] = (hash(i, 52) - 0.5) * 5
+    const count = 80
+    const arr = new Float32Array(count * 3)
+    for (let i = 0; i < count; i++) {
+      arr[i * 3] = (hash(i, 50) - 0.5) * 6
+      arr[i * 3 + 1] = (hash(i, 51) - 0.5) * 6
+      arr[i * 3 + 2] = (hash(i, 52) - 0.5) * 6
     }
     return arr
   }, [])
 
   useFrame(({ clock }) => {
-    if (ref.current) ref.current.rotation.y = clock.getElapsedTime() * 0.006
+    if (ref.current) ref.current.rotation.y = clock.getElapsedTime() * 0.005
   })
 
   return (
@@ -276,10 +316,10 @@ function AmbientParticles() {
         <bufferAttribute attach="attributes-position" args={[positions, 3]} />
       </bufferGeometry>
       <pointsMaterial
-        size={0.005}
+        size={0.008}
         color="#00F0FF"
         transparent
-        opacity={0.12}
+        opacity={0.08}
         sizeAttenuation
         blending={THREE.AdditiveBlending}
         depthWrite={false}
@@ -288,7 +328,7 @@ function AmbientParticles() {
   )
 }
 
-/* ─── Invisible click target sphere ─── */
+/* ─── Invisible click target ─── */
 function ClickTarget({ onClick }: { onClick?: () => void }) {
   const pointerDown = useRef<{ x: number; y: number; time: number } | null>(null)
 
@@ -303,16 +343,53 @@ function ClickTarget({ onClick }: { onClick?: () => void }) {
         const dx = e.clientX - pointerDown.current.x
         const dy = e.clientY - pointerDown.current.y
         const dt = Date.now() - pointerDown.current.time
-        // Only fire click if pointer barely moved and was quick (not a drag)
         if (Math.abs(dx) < 8 && Math.abs(dy) < 8 && dt < 400) {
           onClick()
         }
         pointerDown.current = null
       }}
     >
-      <sphereGeometry args={[1.2, 16, 16]} />
+      <sphereGeometry args={[1.5, 16, 16]} />
       <meshBasicMaterial transparent opacity={0} />
     </mesh>
+  )
+}
+
+/* ─── Loading placeholder ─── */
+function BrainLoading() {
+  const ref = useRef<THREE.Points>(null)
+  const positions = useMemo(() => {
+    const arr = new Float32Array(200 * 3)
+    for (let i = 0; i < 200; i++) {
+      const theta = hash(i, 1) * Math.PI * 2
+      const phi = Math.acos(2 * hash(i, 2) - 1)
+      const r = 0.6 + hash(i, 3) * 0.4
+      arr[i * 3] = r * Math.sin(phi) * Math.cos(theta)
+      arr[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta)
+      arr[i * 3 + 2] = r * Math.cos(phi)
+    }
+    return arr
+  }, [])
+
+  useFrame(({ clock }) => {
+    if (ref.current) ref.current.rotation.y = clock.getElapsedTime() * 0.3
+  })
+
+  return (
+    <points ref={ref}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+      </bufferGeometry>
+      <pointsMaterial
+        size={0.03}
+        color="#00F0FF"
+        transparent
+        opacity={0.4}
+        sizeAttenuation
+        blending={THREE.AdditiveBlending}
+        depthWrite={false}
+      />
+    </points>
   )
 }
 
@@ -320,10 +397,12 @@ function ClickTarget({ onClick }: { onClick?: () => void }) {
 function BrainScene({ state, onClick }: { state: BrainState; onClick?: () => void }) {
   return (
     <>
-      <ambientLight intensity={0.05} />
-      <pointLight position={[2, 3, 2]} intensity={0.2} color="#00F0FF" />
-      <pointLight position={[-2, -1, 3]} intensity={0.1} color="#008888" />
-      <BrainCloud state={state} />
+      <ambientLight intensity={0.02} />
+      <pointLight position={[2, 3, 2]} intensity={0.15} color="#00F0FF" />
+      <pointLight position={[-2, -1, 3]} intensity={0.08} color="#006688" />
+      <Suspense fallback={<BrainLoading />}>
+        <BrainCloud state={state} />
+      </Suspense>
       <ScanRing state={state} />
       <AmbientParticles />
       <ClickTarget onClick={onClick} />
@@ -333,14 +412,14 @@ function BrainScene({ state, onClick }: { state: BrainState; onClick?: () => voi
         rotateSpeed={0.5}
         dampingFactor={0.12}
         enableDamping
-        minPolarAngle={Math.PI * 0.2}
-        maxPolarAngle={Math.PI * 0.8}
+        minPolarAngle={Math.PI * 0.15}
+        maxPolarAngle={Math.PI * 0.85}
       />
       <EffectComposer>
         <Bloom
-          luminanceThreshold={0.1}
+          luminanceThreshold={0.05}
           luminanceSmoothing={0.9}
-          intensity={state === 'thinking' ? 2.5 : state === 'responding' ? 1.8 : 1.0}
+          intensity={state === 'thinking' ? 3.0 : state === 'responding' ? 2.0 : 1.2}
         />
       </EffectComposer>
     </>
@@ -353,13 +432,13 @@ export function HoloBrain({ state = 'idle', size = 'md', className, onClick }: H
     sm: 'h-32 w-32',
     md: 'h-48 w-48',
     lg: 'h-64 w-64',
-    xl: 'h-[22rem] w-[22rem] md:h-[26rem] md:w-[26rem]',
+    xl: 'h-[18rem] w-[18rem] md:h-[22rem] md:w-[22rem]',
   }
 
   return (
-    <div className={`${sizeMap[size]} ${className || ''} cursor-pointer`}>
+    <div className={`${sizeMap[size]} ${className || ''} cursor-pointer overflow-hidden`}>
       <Canvas
-        camera={{ position: [0, 0.1, 2.8], fov: 40 }}
+        camera={{ position: [0, 0.15, 3.5], fov: 34 }}
         gl={{ alpha: true, antialias: true }}
         style={{ background: 'transparent' }}
       >
