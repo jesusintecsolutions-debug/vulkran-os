@@ -234,3 +234,48 @@
   - ui.js: 159KB — framer-motion + componentes UI compartidos
   - Páginas individuales: 0.7KB–2.2KB cada una
 - **PageLoader**: spinner consistente como fallback de Suspense
+
+### Fase F: Backend — 6 Fases de Capacidades Avanzadas
+- **Content Engine** (Remotion):
+  - Modelos: VideoTemplate, VideoProject, VideoMoment, RenderJob, VoiceoverJob, TranscriptionJob
+  - Services: render_service (subprocess Remotion), tts_service (Google Cloud TTS), transcription_service (Faster-Whisper), moment_director_service (Claude genera momentos)
+  - Router: /api/content-engine/* (projects, moments, templates, render, voiceover, transcription)
+  - Remotion bundle: 6 templates (TextReveal, KenBurns, SplitCompare, StatsCounter, TestimonialQuote, ProductShowcase)
+- **Fiscal Advisor**:
+  - Modelos: FiscalConfig, TaxObligation, RecurringInvoice
+  - Service: fiscal_service (cálculo IVA, IRPF, Modelo 303/130, calendario fiscal, cash flow projection)
+- **Playwright Web Automation**:
+  - Service: playwright_service (screenshot, scrape, SEO analysis, competitor research, lead enrichment)
+  - Chromium headless en Docker
+- **CRM Avanzado**:
+  - Modelos: LeadScore, Activity, DripCampaign, DripEnrollment
+  - Lead scoring automático con cron diario
+  - Drip campaigns con procesamiento cada 15 min
+- **Email System**:
+  - Modelos: EmailTemplate, EmailSequence, EmailLog
+  - Templates con variables, secuencias automatizadas vinculadas a drip campaigns
+- **Agent tools**: 43 herramientas totales (23 existentes + 20 nuevas)
+- **Worker cron jobs**: recurring invoices (06:00 UTC), lead scoring (03:00 UTC), drip campaigns (cada 15 min)
+
+### Fase G: Frontend — Content Engine UI
+- **ProjectDetailPage**: vista completa de proyecto con momentos, render, voiceover
+- **MomentEditor**: editor collapsible con tabs (Contenido/Timing/Voiceover), save/delete mutations
+- **SlotEditors**: 8 editores tipados (text, textarea, number, color, select, boolean, image_url, text_array)
+- **RenderProgress**: barra de progreso con polling 2s, descarga al completar
+- **NewProjectModal**: modal creación proyecto con campos + generación AI
+- **VideoProjectList**: lista clickable que navega a detalle del proyecto
+
+### Fase H: Deploy & Production Infrastructure
+- **Docker Compose**: 6 servicios (caddy, api, worker, db, redis, n8n) corriendo en VPS
+- **Dockerfile**: multi-stage con Node.js 20 + Chromium para Remotion + Playwright
+- **Google Cloud TTS**: service account configurado con credenciales JSON
+- **VPS**: desplegado en 46.202.130.233 (Hostinger KVM4)
+
+## [0.2.0] — 2026-03-14
+
+### Production Readiness
+- **Alembic migrations**: configurado async SQLAlchemy env, migración inicial con 27 tablas, lifespan migra en arranque
+- **Backup script**: `scripts/backup-db.sh` — pg_dump diario + retención 7 días
+- **Caddy**: preparado para dominio vulkran-os.com con HTTPS (Let's Encrypt), config comentada lista para activar
+- **Vercel**: `vercel.json` actualizado con rewrites a api.vulkran-os.com, `.env.production` creado
+- **Frontend API**: client.ts usa VITE_API_URL env var, compatible con Vercel deploy

@@ -3,7 +3,7 @@
   "outputDirectory": "frontend/dist",
   "framework": null,
   "rewrites": [
-    { "source": "/api/:path*", "destination": "http://46.202.130.233/api/:path*" },
+    { "source": "/api/:path*", "destination": "https://api.vulkran-os.com/api/:path*" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

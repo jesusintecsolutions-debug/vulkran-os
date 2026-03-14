@@ -8,3 +8,6 @@ node_modules/
 *.egg-info/
 .pytest_cache/
 .ruff_cache/
+backups/
+frontend/.env
+frontend/.env.local
