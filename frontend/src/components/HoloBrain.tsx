@@ -1,5 +1,6 @@
 import { useRef, useMemo, useCallback } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
+import { OrbitControls } from '@react-three/drei'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import * as THREE from 'three'
 
@@ -18,145 +19,153 @@ function hash(i: number, seed: number): number {
   return t - Math.floor(t)
 }
 
-/* ─── Anatomical brain shape: surface-only distribution ─── */
-function generateBrainNodes(count: number): Float32Array {
-  const positions = new Float32Array(count * 3)
+/* ─── Brain surface point: returns [x, y, z] on an anatomical brain shape ─── */
+function brainSurfacePoint(
+  theta: number,
+  phi: number,
+  radiusJitter: number,
+): [number, number, number] {
+  // Base sphere
+  const sx = Math.sin(phi) * Math.cos(theta)
+  const sy = Math.sin(phi) * Math.sin(theta)
+  const sz = Math.cos(phi)
 
-  for (let i = 0; i < count; i++) {
-    const r1 = hash(i, 1)
-    const r2 = hash(i, 2)
-    const r3 = hash(i, 3)
-    const r4 = hash(i, 4)
+  // Scale to brain proportions: wider (X), shorter (Y), elongated (Z)
+  let x = sx * 0.85
+  let y = sy * 0.68
+  let z = sz * 0.95
 
-    // Spherical coordinates
-    const theta = r1 * Math.PI * 2
-    const phi = Math.acos(2 * r2 - 1)
+  // Frontal lobe bulge
+  if (z > 0.15) {
+    const f = Math.pow((z - 0.15) / 0.8, 1.5) * 0.18
+    x *= 1.0 + f
+    y *= 1.0 + f * 0.6
+  }
 
-    // Base sphere direction
-    const sx = Math.sin(phi) * Math.cos(theta)
-    const sy = Math.sin(phi) * Math.sin(theta)
-    const sz = Math.cos(phi)
+  // Temporal lobe widening (sides, lower half)
+  if (y < 0.15 && y > -0.45) {
+    const t = Math.max(0, 1.0 - Math.abs(y + 0.15) / 0.3) * 0.18
+    x *= 1.0 + t
+  }
 
-    // ── Brain-specific deformations ──
+  // Occipital lobe (back)
+  if (z < -0.25) {
+    const o = Math.pow((-z - 0.25) / 0.7, 1.5) * 0.1
+    y *= 1.0 + o
+  }
 
-    // 1. Elongate front-to-back (Z axis) and flatten top-to-bottom (Y axis slightly)
-    let x = sx * 0.82
-    let y = sy * 0.72
-    let z = sz * 0.92
+  // Parietal widening (top)
+  if (y > 0.1) {
+    x *= 1.0 + y * 0.12
+    z *= 1.0 + y * 0.06
+  }
 
-    // 2. Widen at the top (parietal), narrow at the bottom (brainstem area)
-    const verticalFactor = y > 0 ? 1.0 + y * 0.15 : 1.0 - Math.abs(y) * 0.3
-    x *= verticalFactor
-    z *= verticalFactor
+  // Flatten bottom
+  if (y < -0.5) y = -0.5 - (y + 0.5) * 0.15
 
-    // 3. Frontal lobe bulge (front = positive Z)
-    if (z > 0.2) {
-      const frontalBulge = Math.pow((z - 0.2) / 0.72, 2) * 0.12
-      x *= 1.0 + frontalBulge
-      y *= 1.0 + frontalBulge * 0.5
-    }
+  // Longitudinal fissure
+  const fissureWidth = y > 0 ? 0.055 + y * 0.04 : 0.025
+  if (Math.abs(x) < fissureWidth) {
+    x += (x >= 0 ? 1 : -1) * (fissureWidth - Math.abs(x) + 0.015)
+  }
 
-    // 4. Temporal lobe widening (sides at mid-low height)
-    if (y < 0.1 && y > -0.5) {
-      const temporalFactor = (1.0 - Math.abs(y + 0.2) / 0.3) * 0.15
-      x *= 1.0 + Math.max(0, temporalFactor)
-    }
+  // Sulci/gyri surface detail
+  const s1 = Math.sin(x * 7 + z * 9) * 0.022
+  const s2 = Math.sin(y * 13 + x * 11) * 0.015
+  const s3 = Math.cos(z * 8 + y * 7) * 0.018
+  const sulci = s1 + s2 + s3
 
-    // 5. Occipital bulge (back = negative Z)
-    if (z < -0.3) {
-      const occipitalBulge = Math.pow((-z - 0.3) / 0.62, 2) * 0.08
-      x *= 1.0 + occipitalBulge * 0.5
-      y *= 1.0 + occipitalBulge
-    }
+  const len = Math.sqrt(x * x + y * y + z * z) || 1
+  const nx = x / len, ny = y / len, nz = z / len
+  x += nx * (sulci + radiusJitter)
+  y += ny * (sulci + radiusJitter) * 0.7
+  z += nz * (sulci + radiusJitter)
 
-    // 6. Longitudinal fissure (gap between hemispheres at top)
-    const fissureDepth = y > 0 ? 0.06 + y * 0.04 : 0.03
-    if (Math.abs(x) < fissureDepth) {
-      x += (x >= 0 ? 1 : -1) * (fissureDepth - Math.abs(x) + 0.02)
-    }
+  return [x, y, z]
+}
 
-    // 7. Flatten bottom (base of brain)
-    if (y < -0.55) {
-      y = -0.55 - (y + 0.55) * 0.2
-    }
+/* ─── Generate dense brain particles ─── */
+const SURFACE_COUNT = 3500
+const INNER_COUNT = 800
+const TOTAL = SURFACE_COUNT + INNER_COUNT
 
-    // 8. Surface noise for sulci/gyri (cortical folds)
-    const freq1 = 6.0, freq2 = 12.0
-    const sulci =
-      Math.sin(x * freq1 + z * freq1 * 1.3) * 0.025 +
-      Math.sin(y * freq2 + x * freq2 * 0.8) * 0.015 +
-      Math.cos(z * freq1 * 1.7 + y * freq1) * 0.02
+function generateBrainCloud(): { positions: Float32Array; depths: Float32Array } {
+  const positions = new Float32Array(TOTAL * 3)
+  const depths = new Float32Array(TOTAL) // 0=surface, 1=deep interior
 
-    // Apply noise along the surface normal (radial direction)
-    const len = Math.sqrt(x * x + y * y + z * z) || 1
-    x += (x / len) * sulci
-    y += (y / len) * sulci * 0.7
-    z += (z / len) * sulci
+  // Surface particles — dense shell
+  for (let i = 0; i < SURFACE_COUNT; i++) {
+    const theta = hash(i, 1) * Math.PI * 2
+    const phi = Math.acos(2 * hash(i, 2) - 1)
+    const jitter = (hash(i, 3) - 0.5) * 0.035
 
-    // 9. Slight random surface displacement for organic feel
-    const disp = (r3 - 0.5) * 0.025 + (r4 - 0.5) * 0.015
-    x += (x / len) * disp
-    y += (y / len) * disp
-    z += (z / len) * disp
-
+    const [x, y, z] = brainSurfacePoint(theta, phi, jitter)
     positions[i * 3] = x
     positions[i * 3 + 1] = y
     positions[i * 3 + 2] = z
+    depths[i] = 0
   }
 
-  return positions
-}
+  // Inner volume particles — sparser, for depth/glow
+  for (let i = 0; i < INNER_COUNT; i++) {
+    const idx = SURFACE_COUNT + i
+    const theta = hash(i, 10) * Math.PI * 2
+    const phi = Math.acos(2 * hash(i, 11) - 1)
+    const shrink = 0.3 + hash(i, 12) * 0.5 // 30%-80% of surface radius
+    const jitter = (hash(i, 13) - 0.5) * 0.02
 
-/* ─── Connection lines between nearby nodes ─── */
-function generateConnections(
-  positions: Float32Array,
-  nodeCount: number,
-  maxDistance: number,
-  maxConn: number,
-): Float32Array {
-  const lines: number[] = []
-  const connCount = new Uint8Array(nodeCount)
-
-  for (let i = 0; i < nodeCount; i++) {
-    if (connCount[i] >= maxConn) continue
-    const ix = positions[i * 3], iy = positions[i * 3 + 1], iz = positions[i * 3 + 2]
-
-    for (let j = i + 1; j < nodeCount; j++) {
-      if (connCount[j] >= maxConn) continue
-      const dx = positions[j * 3] - ix
-      const dy = positions[j * 3 + 1] - iy
-      const dz = positions[j * 3 + 2] - iz
-      const dist = dx * dx + dy * dy + dz * dz // squared distance
-
-      if (dist < maxDistance * maxDistance) {
-        // Don't connect across the fissure (both must be same hemisphere)
-        if (ix * positions[j * 3] < -0.001) continue
-
-        lines.push(ix, iy, iz, positions[j * 3], positions[j * 3 + 1], positions[j * 3 + 2])
-        connCount[i]++
-        connCount[j]++
-      }
-    }
+    const [sx, sy, sz] = brainSurfacePoint(theta, phi, jitter)
+    positions[idx * 3] = sx * shrink
+    positions[idx * 3 + 1] = sy * shrink
+    positions[idx * 3 + 2] = sz * shrink
+    depths[idx] = 1.0 - shrink
   }
 
-  return new Float32Array(lines)
+  return { positions, depths }
 }
 
-const NODE_COUNT = 650
-
-/* ─── Neural nodes (points) ─── */
-function BrainNodes({ state }: { state: BrainState }) {
+/* ─── Brain particle cloud ─── */
+function BrainCloud({ state }: { state: BrainState }) {
   const pointsRef = useRef<THREE.Points>(null)
 
-  const { positions, baseSizes, phases } = useMemo(() => {
-    const pos = generateBrainNodes(NODE_COUNT)
-    const sz = new Float32Array(NODE_COUNT)
-    const ph = new Float32Array(NODE_COUNT)
-    for (let i = 0; i < NODE_COUNT; i++) {
-      sz[i] = 0.012 + hash(i, 10) * 0.022
-      ph[i] = hash(i, 20) * Math.PI * 2
+  const { positions, colors, baseSizes, phases } = useMemo(() => {
+    const { positions: pos, depths } = generateBrainCloud()
+
+    // Color gradient: surface = bright cyan, interior = deeper teal/blue
+    const col = new Float32Array(TOTAL * 3)
+    const sz = new Float32Array(TOTAL)
+    const ph = new Float32Array(TOTAL)
+
+    for (let i = 0; i < TOTAL; i++) {
+      const d = depths[i]
+      const y = pos[i * 3 + 1]
+      const x = pos[i * 3]
+
+      // Height-based color variation: top = cyan, bottom = teal
+      const heightFactor = (y + 0.7) / 1.4 // 0 at bottom, 1 at top
+      const sideFactor = Math.abs(x) / 0.9 // 0 at center, 1 at sides
+
+      // RGB: mix between cyan (#00F0FF) and teal (#008090) based on height + depth
+      const r = d > 0.3 ? 0.0 : 0.0 + sideFactor * 0.05
+      const g = d > 0.3
+        ? 0.3 + heightFactor * 0.3
+        : 0.7 + heightFactor * 0.25 + sideFactor * 0.05
+      const b = d > 0.3
+        ? 0.4 + heightFactor * 0.2
+        : 0.85 + heightFactor * 0.15
+
+      col[i * 3] = r
+      col[i * 3 + 1] = g
+      col[i * 3 + 2] = b
+
+      // Size: surface = small dense, interior = larger glow
+      sz[i] = d > 0.3
+        ? 0.015 + hash(i, 30) * 0.02 // inner: larger
+        : 0.006 + hash(i, 30) * 0.012 // surface: small and dense
+      ph[i] = hash(i, 40) * Math.PI * 2
     }
-    return { positions: pos, baseSizes: sz, phases: ph }
+
+    return { positions: pos, colors: col, baseSizes: sz, phases: ph }
   }, [])
 
   const liveSizes = useMemo(() => new Float32Array(baseSizes), [baseSizes])
@@ -167,37 +176,32 @@ function BrainNodes({ state }: { state: BrainState }) {
     const geo = pointsRef.current.geometry
     const sizeAttr = geo.getAttribute('size') as THREE.BufferAttribute
 
-    const pulseSpeed = state === 'thinking' ? 4 : state === 'responding' ? 2.5 : 1
-    const pulseAmp = state === 'thinking' ? 0.018 : state === 'responding' ? 0.012 : 0.006
+    const pulseSpeed = state === 'thinking' ? 5 : state === 'responding' ? 3 : 1.2
+    const pulseAmp = state === 'thinking' ? 0.008 : state === 'responding' ? 0.005 : 0.002
 
-    for (let i = 0; i < NODE_COUNT; i++) {
+    for (let i = 0; i < TOTAL; i++) {
       liveSizes[i] = baseSizes[i] + Math.sin(t * pulseSpeed + phases[i]) * pulseAmp
     }
     sizeAttr.array = liveSizes
     sizeAttr.needsUpdate = true
 
-    const rotSpeed = state === 'thinking' ? 0.15 : state === 'responding' ? 0.1 : 0.03
-    pointsRef.current.rotation.y += rotSpeed * 0.016
-    pointsRef.current.rotation.x = Math.sin(t * 0.2) * 0.04
+    // Slow auto-rotation (only when not dragging — OrbitControls handles drag)
+    const autoSpeed = state === 'thinking' ? 0.08 : state === 'responding' ? 0.05 : 0.015
+    pointsRef.current.rotation.y += autoSpeed * 0.016
   })
-
-  const color = state === 'thinking' ? '#00F0FF'
-    : state === 'responding' ? '#40F8FF'
-    : state === 'activating' ? '#FFFFFF'
-    : state === 'typing' ? '#60D0E0'
-    : '#00C8D8'
 
   return (
     <points ref={pointsRef}>
       <bufferGeometry>
         <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+        <bufferAttribute attach="attributes-color" args={[colors, 3]} />
         <bufferAttribute attach="attributes-size" args={[new Float32Array(baseSizes), 1]} />
       </bufferGeometry>
       <pointsMaterial
-        size={0.028}
-        color={color}
+        size={0.018}
+        vertexColors
         transparent
-        opacity={state === 'idle' ? 0.7 : 0.95}
+        opacity={state === 'idle' ? 0.75 : 0.95}
         sizeAttenuation
         blending={THREE.AdditiveBlending}
         depthWrite={false}
@@ -206,46 +210,7 @@ function BrainNodes({ state }: { state: BrainState }) {
   )
 }
 
-/* ─── Synaptic connections (lines) ─── */
-function BrainConnections({ state }: { state: BrainState }) {
-  const linesRef = useRef<THREE.LineSegments>(null)
-
-  const linePositions = useMemo(() => {
-    const positions = generateBrainNodes(NODE_COUNT)
-    return generateConnections(positions, NODE_COUNT, 0.22, 4)
-  }, [])
-
-  useFrame(({ clock }) => {
-    if (!linesRef.current) return
-    const t = clock.getElapsedTime()
-    const rotSpeed = state === 'thinking' ? 0.15 : state === 'responding' ? 0.1 : 0.03
-    linesRef.current.rotation.y += rotSpeed * 0.016
-    linesRef.current.rotation.x = Math.sin(t * 0.2) * 0.04
-
-    const mat = linesRef.current.material as THREE.LineBasicMaterial
-    const baseOp = state === 'thinking' ? 0.3 : state === 'responding' ? 0.22 : 0.1
-    mat.opacity = baseOp + Math.sin(t * 2) * 0.04
-  })
-
-  const color = state === 'thinking' ? '#00F0FF' : state === 'responding' ? '#30D0E0' : '#007888'
-
-  return (
-    <lineSegments ref={linesRef}>
-      <bufferGeometry>
-        <bufferAttribute attach="attributes-position" args={[linePositions, 3]} />
-      </bufferGeometry>
-      <lineBasicMaterial
-        color={color}
-        transparent
-        opacity={0.12}
-        blending={THREE.AdditiveBlending}
-        depthWrite={false}
-      />
-    </lineSegments>
-  )
-}
-
-/* ─── Scan line — thin glowing ring that sweeps through the brain ─── */
+/* ─── Scan line — thin glowing ring ─── */
 function ScanRing({ state }: { state: BrainState }) {
   const ringRef = useRef<THREE.LineLoop>(null)
 
@@ -254,9 +219,9 @@ function ScanRing({ state }: { state: BrainState }) {
     const arr = new Float32Array(segments * 3)
     for (let i = 0; i < segments; i++) {
       const angle = (i / segments) * Math.PI * 2
-      arr[i * 3] = Math.cos(angle) * 0.95
+      arr[i * 3] = Math.cos(angle) * 0.92
       arr[i * 3 + 1] = 0
-      arr[i * 3 + 2] = Math.sin(angle) * 0.85
+      arr[i * 3 + 2] = Math.sin(angle) * 0.88
     }
     return arr
   }, [])
@@ -264,11 +229,11 @@ function ScanRing({ state }: { state: BrainState }) {
   useFrame(({ clock }) => {
     if (!ringRef.current) return
     const t = clock.getElapsedTime()
-    const speed = state === 'thinking' ? 1.5 : 0.5
-    ringRef.current.position.y = Math.sin(t * speed) * 0.65
+    const speed = state === 'thinking' ? 1.8 : 0.5
+    ringRef.current.position.y = Math.sin(t * speed) * 0.6
 
     const mat = ringRef.current.material as THREE.LineBasicMaterial
-    mat.opacity = state === 'idle' ? 0.06 : state === 'thinking' ? 0.25 : 0.12
+    mat.opacity = state === 'idle' ? 0.04 : state === 'thinking' ? 0.2 : 0.1
   })
 
   return (
@@ -279,7 +244,7 @@ function ScanRing({ state }: { state: BrainState }) {
       <lineBasicMaterial
         color="#00F0FF"
         transparent
-        opacity={0.1}
+        opacity={0.08}
         blending={THREE.AdditiveBlending}
         depthWrite={false}
       />
@@ -287,13 +252,13 @@ function ScanRing({ state }: { state: BrainState }) {
   )
 }
 
-/* ─── Ambient particles ─── */
+/* ─── Ambient dust ─── */
 function AmbientParticles() {
   const ref = useRef<THREE.Points>(null)
 
   const positions = useMemo(() => {
-    const arr = new Float32Array(80 * 3)
-    for (let i = 0; i < 80; i++) {
+    const arr = new Float32Array(60 * 3)
+    for (let i = 0; i < 60; i++) {
       arr[i * 3] = (hash(i, 50) - 0.5) * 5
       arr[i * 3 + 1] = (hash(i, 51) - 0.5) * 5
       arr[i * 3 + 2] = (hash(i, 52) - 0.5) * 5
@@ -302,7 +267,7 @@ function AmbientParticles() {
   }, [])
 
   useFrame(({ clock }) => {
-    if (ref.current) ref.current.rotation.y = clock.getElapsedTime() * 0.008
+    if (ref.current) ref.current.rotation.y = clock.getElapsedTime() * 0.006
   })
 
   return (
@@ -311,10 +276,10 @@ function AmbientParticles() {
         <bufferAttribute attach="attributes-position" args={[positions, 3]} />
       </bufferGeometry>
       <pointsMaterial
-        size={0.006}
+        size={0.005}
         color="#00F0FF"
         transparent
-        opacity={0.15}
+        opacity={0.12}
         sizeAttenuation
         blending={THREE.AdditiveBlending}
         depthWrite={false}
@@ -327,18 +292,26 @@ function AmbientParticles() {
 function BrainScene({ state }: { state: BrainState }) {
   return (
     <>
-      <ambientLight intensity={0.08} />
-      <pointLight position={[3, 3, 3]} intensity={0.25} color="#00F0FF" />
-      <pointLight position={[-3, -2, 3]} intensity={0.12} color="#00F0FF" />
-      <BrainNodes state={state} />
-      <BrainConnections state={state} />
+      <ambientLight intensity={0.05} />
+      <pointLight position={[2, 3, 2]} intensity={0.2} color="#00F0FF" />
+      <pointLight position={[-2, -1, 3]} intensity={0.1} color="#008888" />
+      <BrainCloud state={state} />
       <ScanRing state={state} />
       <AmbientParticles />
+      <OrbitControls
+        enableZoom={false}
+        enablePan={false}
+        rotateSpeed={0.5}
+        dampingFactor={0.12}
+        enableDamping
+        minPolarAngle={Math.PI * 0.2}
+        maxPolarAngle={Math.PI * 0.8}
+      />
       <EffectComposer>
         <Bloom
-          luminanceThreshold={0.15}
+          luminanceThreshold={0.1}
           luminanceSmoothing={0.9}
-          intensity={state === 'thinking' ? 2.2 : state === 'responding' ? 1.6 : 0.9}
+          intensity={state === 'thinking' ? 2.5 : state === 'responding' ? 1.8 : 1.0}
         />
       </EffectComposer>
     </>
@@ -359,7 +332,7 @@ export function HoloBrain({ state = 'idle', size = 'md', className, onClick }: H
   return (
     <div className={`${sizeMap[size]} ${className || ''} cursor-pointer`} onClick={handleClick}>
       <Canvas
-        camera={{ position: [0, 0.1, 2.4], fov: 45 }}
+        camera={{ position: [0, 0.15, 2.2], fov: 45 }}
         gl={{ alpha: true, antialias: true }}
         style={{ background: 'transparent' }}
       >
