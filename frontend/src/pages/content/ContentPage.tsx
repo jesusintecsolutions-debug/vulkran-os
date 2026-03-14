@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/api/client'
 import { GlassCard, Badge } from '@/components/ui'
-import { FileText, Video, Plus, Play, Loader2, Sparkles } from 'lucide-react'
+import { FileText, Video, Plus } from 'lucide-react'
 import { VideoProjectList } from '@/components/content/VideoProjectList'
 import { NewProjectModal } from '@/components/content/NewProjectModal'
 
