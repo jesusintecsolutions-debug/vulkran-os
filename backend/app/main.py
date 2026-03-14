@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.database import engine
+from app.database import engine, Base
 from app.exceptions import register_error_handlers
 from app.middleware import RateLimitMiddleware
 from app.routers import auth_router, clients_router, agent_router, notifications_router, files_router, content_router, leads_router, briefing_router, accounting_router, render_router
@@ -27,12 +27,23 @@ logger = logging.getLogger("vulkran")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("VULKRAN OS v%s starting up...", settings.app_version)
-    # Run Alembic migrations on startup
-    from alembic.config import Config
-    from alembic import command
-    alembic_cfg = Config("alembic.ini")
-    command.upgrade(alembic_cfg, "head")
-    logger.info("Database migrations applied")
+    # Create tables (safe — uses IF NOT EXISTS internally)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    logger.info("Database tables ready")
+    # Stamp Alembic version if available
+    try:
+        import pathlib
+        ini_path = pathlib.Path(__file__).resolve().parent.parent / "alembic.ini"
+        if ini_path.exists():
+            from alembic.config import Config
+            from alembic import command
+            alembic_cfg = Config(str(ini_path))
+            alembic_cfg.set_main_option("script_location", str(ini_path.parent / "alembic"))
+            command.stamp(alembic_cfg, "head")
+            logger.info("Alembic stamped at head")
+    except Exception as e:
+        logger.warning("Alembic stamp skipped: %s", e)
     yield
     await engine.dispose()
     logger.info("VULKRAN OS shut down")
