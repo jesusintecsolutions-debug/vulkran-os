@@ -63,10 +63,10 @@ function brainSurfacePoint(
   // Flatten bottom
   if (y < -0.5) y = -0.5 - (y + 0.5) * 0.15
 
-  // Longitudinal fissure
-  const fissureWidth = y > 0 ? 0.055 + y * 0.04 : 0.025
+  // Longitudinal fissure — subtle groove, not a gap
+  const fissureWidth = y > 0 ? 0.02 + y * 0.015 : 0.008
   if (Math.abs(x) < fissureWidth) {
-    x += (x >= 0 ? 1 : -1) * (fissureWidth - Math.abs(x) + 0.015)
+    x += (x >= 0 ? 1 : -1) * (fissureWidth - Math.abs(x) + 0.005)
   }
 
   // Sulci/gyri surface detail
@@ -219,9 +219,9 @@ function ScanRing({ state }: { state: BrainState }) {
     const arr = new Float32Array(segments * 3)
     for (let i = 0; i < segments; i++) {
       const angle = (i / segments) * Math.PI * 2
-      arr[i * 3] = Math.cos(angle) * 0.92
+      arr[i * 3] = Math.cos(angle) * 0.82
       arr[i * 3 + 1] = 0
-      arr[i * 3 + 2] = Math.sin(angle) * 0.88
+      arr[i * 3 + 2] = Math.sin(angle) * 0.78
     }
     return arr
   }, [])
@@ -321,10 +321,10 @@ function BrainScene({ state }: { state: BrainState }) {
 /* ─── Public component ─── */
 export function HoloBrain({ state = 'idle', size = 'md', className, onClick }: HoloBrainProps) {
   const sizeMap = {
-    sm: 'h-24 w-24',
-    md: 'h-40 w-40',
-    lg: 'h-56 w-56',
-    xl: 'h-72 w-72 md:h-80 md:w-80',
+    sm: 'h-32 w-32',
+    md: 'h-48 w-48',
+    lg: 'h-64 w-64',
+    xl: 'h-[22rem] w-[22rem] md:h-[26rem] md:w-[26rem]',
   }
 
   const handleClick = useCallback(() => onClick?.(), [onClick])
@@ -332,7 +332,7 @@ export function HoloBrain({ state = 'idle', size = 'md', className, onClick }: H
   return (
     <div className={`${sizeMap[size]} ${className || ''} cursor-pointer`} onClick={handleClick}>
       <Canvas
-        camera={{ position: [0, 0.15, 2.2], fov: 45 }}
+        camera={{ position: [0, 0.1, 2.8], fov: 40 }}
         gl={{ alpha: true, antialias: true }}
         style={{ background: 'transparent' }}
       >
