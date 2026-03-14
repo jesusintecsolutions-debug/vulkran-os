@@ -21,7 +21,7 @@ from app.models.content_engine import (
     VoiceoverJob,
     TranscriptionJob,
 )
-from app.routers.auth import require_admin
+from app.auth import require_admin
 
 router = APIRouter(prefix="/api/content-engine", tags=["content-engine"])
 
