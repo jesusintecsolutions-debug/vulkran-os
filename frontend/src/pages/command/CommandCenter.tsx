@@ -416,7 +416,7 @@ export default function CommandCenter() {
   // Wheel rotates modules
   useEffect(() => {
     if (!modulesRevealed) return
-    const handleWheel = (e: WheelEvent) => startFadeTimer()
+    const handleWheel = () => startFadeTimer()
     window.addEventListener('wheel', handleWheel, { passive: true })
     return () => window.removeEventListener('wheel', handleWheel)
   }, [modulesRevealed, startFadeTimer])

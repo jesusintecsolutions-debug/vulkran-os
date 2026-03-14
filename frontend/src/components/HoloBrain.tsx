@@ -1,4 +1,4 @@
-import { useRef, useMemo, useState, useEffect, Suspense } from 'react'
+import { useRef, useMemo, Suspense } from 'react'
 import { Canvas, useFrame, useLoader } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
