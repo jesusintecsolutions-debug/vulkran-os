@@ -39,7 +39,7 @@ const holoVertexShader = /* glsl */ `
     float size = aSize + pulse;
 
     vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-    gl_PointSize = size * (300.0 / -mvPosition.z);
+    gl_PointSize = size * (40.0 / -mvPosition.z);
     gl_Position = projectionMatrix * mvPosition;
   }
 `
@@ -179,22 +179,22 @@ function BrainCloud({ state }: { state: BrainState }) {
 
       // Cyan core (#00F0FF) → teal edge (#006080) with height variation
       if (d > 0.3) {
-        // Inner particles: deep blue/teal, brighter
+        // Inner particles: deeper teal
         colors[i * 3] = 0.0
-        colors[i * 3 + 1] = 0.5 + hf * 0.4
-        colors[i * 3 + 2] = 0.7 + hf * 0.3
+        colors[i * 3 + 1] = 0.3 + hf * 0.25
+        colors[i * 3 + 2] = 0.45 + hf * 0.2
       } else {
-        // Surface particles: cyan with subtle variation
-        const side = Math.abs(x) * 0.3
-        colors[i * 3] = 0.0 + side * 0.05
-        colors[i * 3 + 1] = 0.75 + hf * 0.2
-        colors[i * 3 + 2] = 0.9 + hf * 0.1
+        // Surface particles: cyan, moderate brightness
+        const side = Math.abs(x) * 0.2
+        colors[i * 3] = 0.0 + side * 0.03
+        colors[i * 3 + 1] = 0.5 + hf * 0.15
+        colors[i * 3 + 2] = 0.6 + hf * 0.1
       }
 
       // Size: surface = tiny dense points, inner = slightly larger glow dots
       sizes[i] = d > 0.3
-        ? 2.5 + hash(i, 30) * 3.5  // inner
-        : 1.0 + hash(i, 30) * 2.0  // surface
+        ? 1.2 + hash(i, 30) * 1.5  // inner: slightly larger
+        : 0.5 + hash(i, 30) * 0.8  // surface: small and dense
 
       phases[i] = hash(i, 40) * Math.PI * 2
     }
@@ -215,7 +215,7 @@ function BrainCloud({ state }: { state: BrainState }) {
         uTime: { value: 0 },
         uPulseSpeed: { value: 1.2 },
         uPulseAmp: { value: 0.3 },
-        uOpacity: { value: 0.85 },
+        uOpacity: { value: 0.65 },
       },
       transparent: true,
       blending: THREE.AdditiveBlending,
@@ -238,7 +238,7 @@ function BrainCloud({ state }: { state: BrainState }) {
     mat.uniforms.uTime.value = t
     mat.uniforms.uPulseSpeed.value = isThinking ? 5.0 : isResponding ? 3.0 : 1.2
     mat.uniforms.uPulseAmp.value = isThinking ? 1.0 : isResponding ? 0.6 : 0.3
-    mat.uniforms.uOpacity.value = isIdle ? 0.8 : 0.95
+    mat.uniforms.uOpacity.value = isIdle ? 0.6 : 0.75
 
     // Slow auto-rotation
     const autoSpeed = isThinking ? 0.08 : isResponding ? 0.05 : 0.012
