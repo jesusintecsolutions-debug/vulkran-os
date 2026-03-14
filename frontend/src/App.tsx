@@ -7,6 +7,9 @@ import AppLayout from '@/layouts/AppLayout'
 import LoginPage from '@/pages/auth/LoginPage'
 import DashboardPage from '@/pages/dashboard/DashboardPage'
 
+// Command Center — radial Jarvis interface (includes Three.js)
+const CommandCenter = lazy(() => import('@/pages/command/CommandCenter'))
+
 // Lazy-loaded pages (code-split chunks)
 const ClientsPage = lazy(() => import('@/pages/clients/ClientsPage'))
 const ContentPage = lazy(() => import('@/pages/content/ContentPage'))
@@ -14,7 +17,7 @@ const ProjectDetailPage = lazy(() => import('@/pages/content/ProjectDetailPage')
 const LeadsPage = lazy(() => import('@/pages/leads/LeadsPage'))
 const AccountingPage = lazy(() => import('@/pages/accounting/AccountingPage'))
 const BriefingPage = lazy(() => import('@/pages/briefing/BriefingPage'))
-const ChatPage = lazy(() => import('@/pages/chat/ChatPage'))  // includes Three.js
+const ChatPage = lazy(() => import('@/pages/chat/ChatPage'))
 const FilesPage = lazy(() => import('@/pages/files/FilesPage'))
 const SettingsPage = lazy(() => import('@/pages/settings/SettingsPage'))
 
@@ -64,6 +67,18 @@ export default function App() {
         <AppInit>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+
+            {/* Command Center — radial home (no sidebar) */}
+            <Route
+              index
+              element={
+                <ProtectedRoute>
+                  <Suspense fallback={<PageLoader />}><CommandCenter /></Suspense>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Section pages — with sidebar layout */}
             <Route
               element={
                 <ProtectedRoute>
@@ -71,7 +86,7 @@ export default function App() {
                 </ProtectedRoute>
               }
             >
-              <Route index element={<DashboardPage />} />
+              <Route path="dashboard" element={<DashboardPage />} />
               <Route path="clients" element={<Suspense fallback={<PageLoader />}><ClientsPage /></Suspense>} />
               <Route path="content" element={<Suspense fallback={<PageLoader />}><ContentPage /></Suspense>} />
               <Route path="content/projects/:id" element={<Suspense fallback={<PageLoader />}><ProjectDetailPage /></Suspense>} />

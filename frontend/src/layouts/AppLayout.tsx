@@ -31,7 +31,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'partner', 'client'], mobileNav: true },
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'partner', 'client'], mobileNav: true },
   { to: '/clients', label: 'Clientes', icon: Users, roles: ['admin'] },
   { to: '/content', label: 'Contenido', icon: FileText, roles: ['admin', 'client'], mobileNav: true },
   { to: '/leads', label: 'Leads', icon: Target, roles: ['admin'], mobileNav: true },
@@ -50,10 +50,7 @@ export default function AppLayout() {
 
   const visibleItems = NAV_ITEMS.filter((item) => item.roles.includes(role))
   const mobileItems = visibleItems.filter((item) => item.mobileNav)
-  const currentPage = visibleItems.find((i) => {
-    if (i.to === '/') return location.pathname === '/'
-    return location.pathname.startsWith(i.to)
-  })
+  const currentPage = visibleItems.find((i) => location.pathname.startsWith(i.to))
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -99,14 +96,12 @@ export default function AppLayout() {
         <nav className="flex-1 overflow-y-auto px-2 py-3">
           <ul className="space-y-0.5">
             {visibleItems.map((item) => {
-              const isActive =
-                item.to === '/' ? location.pathname === '/' : location.pathname.startsWith(item.to)
+              const isActive = location.pathname.startsWith(item.to)
               const Icon = item.icon
               return (
                 <li key={item.to}>
                   <NavLink
                     to={item.to}
-                    end={item.to === '/'}
                     onClick={() => setSidebarOpen(false)}
                     className={cn(
                       'relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
@@ -200,14 +195,12 @@ export default function AppLayout() {
       <nav className="fixed bottom-0 left-0 right-0 z-30 md:hidden glass-strong border-t border-border safe-area-bottom">
         <div className="flex items-center justify-around h-14 px-2">
           {mobileItems.map((item) => {
-            const isActive =
-              item.to === '/' ? location.pathname === '/' : location.pathname.startsWith(item.to)
+            const isActive = location.pathname.startsWith(item.to)
             const Icon = item.icon
             return (
               <NavLink
                 key={item.to}
                 to={item.to}
-                end={item.to === '/'}
                 className={cn(
                   'flex flex-col items-center justify-center gap-0.5 px-3 py-1 rounded-lg transition-all min-w-[48px]',
                   isActive
