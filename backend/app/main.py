@@ -10,7 +10,7 @@ from app.config import get_settings
 from app.database import engine, Base
 from app.exceptions import register_error_handlers
 from app.middleware import RateLimitMiddleware
-from app.routers import auth_router, clients_router, agent_router, notifications_router, files_router, content_router, leads_router, briefing_router, accounting_router
+from app.routers import auth_router, clients_router, agent_router, notifications_router, files_router, content_router, leads_router, briefing_router, accounting_router, render_router
 
 # Ensure all models are imported so Base.metadata knows about them
 import app.models  # noqa: F401
@@ -67,6 +67,7 @@ app.include_router(content_router)
 app.include_router(leads_router)
 app.include_router(briefing_router)
 app.include_router(accounting_router)
+app.include_router(render_router)
 
 
 @app.get("/health")

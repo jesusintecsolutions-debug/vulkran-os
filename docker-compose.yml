@@ -24,13 +24,23 @@ services:
       - SECRET_KEY=${SECRET_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      - TAVILY_API_KEY=${TAVILY_API_KEY}
+      - FAL_KEY=${FAL_KEY}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/gcloud-tts.json
+      - REMOTION_PATH=/app/remotion
     volumes:
       - ./data:/app/data
+      - remotion_modules:/app/remotion/node_modules
+      - ./remotion:/app/remotion:ro
+      - ./credentials:/app/credentials:ro
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+      remotion:
+        condition: service_started
 
   worker:
     build: ./backend
@@ -41,13 +51,29 @@ services:
       - REDIS_URL=${REDIS_URL}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      - TAVILY_API_KEY=${TAVILY_API_KEY}
+      - FAL_KEY=${FAL_KEY}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/gcloud-tts.json
+      - REMOTION_PATH=/app/remotion
     volumes:
       - ./data:/app/data
+      - remotion_modules:/app/remotion/node_modules
+      - ./remotion:/app/remotion:ro
+      - ./credentials:/app/credentials:ro
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+      remotion:
+        condition: service_started
+
+  remotion:
+    build: ./remotion
+    restart: unless-stopped
+    volumes:
+      - remotion_modules:/app/remotion/node_modules
 
   db:
     image: postgres:16-alpine
@@ -93,3 +119,4 @@ volumes:
   n8ndata:
   caddy_data:
   caddy_config:
+  remotion_modules:

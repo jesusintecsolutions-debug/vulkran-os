@@ -42,6 +42,16 @@ class Settings(BaseSettings):
     # Image Generation
     fal_api_key: str = ""
 
+    # Google Cloud TTS
+    google_tts_credentials_path: str = ""
+    google_tts_default_voice: str = "es-ES-Wavenet-B"
+    google_tts_default_language: str = "es-ES"
+
+    # Remotion / Content Engine
+    remotion_path: str = "/app/remotion"
+    render_max_workers: int = 2
+    render_concurrency: int = 4
+
     # Storage
     data_dir: str = "/app/data"
 

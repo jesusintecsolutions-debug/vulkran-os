@@ -6,7 +6,7 @@ FROM python:3.12-slim AS deps
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc libpq-dev \
+    gcc libpq-dev build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
@@ -20,10 +20,15 @@ FROM python:3.12-slim AS runtime
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq5 curl \
+    libpq5 curl chromium chromium-driver gnupg \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/* \
     && addgroup --gid 1001 appgroup \
     && adduser --uid 1001 --gid 1001 --disabled-password --gecos "" appuser
+
+ENV PLAYWRIGHT_BROWSERS_PATH=/usr/lib/chromium
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 
 COPY --from=deps /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=deps /usr/local/bin /usr/local/bin

@@ -10,6 +10,7 @@ import DashboardPage from '@/pages/dashboard/DashboardPage'
 // Lazy-loaded pages (code-split chunks)
 const ClientsPage = lazy(() => import('@/pages/clients/ClientsPage'))
 const ContentPage = lazy(() => import('@/pages/content/ContentPage'))
+const ProjectDetailPage = lazy(() => import('@/pages/content/ProjectDetailPage'))
 const LeadsPage = lazy(() => import('@/pages/leads/LeadsPage'))
 const AccountingPage = lazy(() => import('@/pages/accounting/AccountingPage'))
 const BriefingPage = lazy(() => import('@/pages/briefing/BriefingPage'))
@@ -73,6 +74,7 @@ export default function App() {
               <Route index element={<DashboardPage />} />
               <Route path="clients" element={<Suspense fallback={<PageLoader />}><ClientsPage /></Suspense>} />
               <Route path="content" element={<Suspense fallback={<PageLoader />}><ContentPage /></Suspense>} />
+              <Route path="content/projects/:id" element={<Suspense fallback={<PageLoader />}><ProjectDetailPage /></Suspense>} />
               <Route path="leads" element={<Suspense fallback={<PageLoader />}><LeadsPage /></Suspense>} />
               <Route path="accounting" element={<Suspense fallback={<PageLoader />}><AccountingPage /></Suspense>} />
               <Route path="briefing" element={<Suspense fallback={<PageLoader />}><BriefingPage /></Suspense>} />
