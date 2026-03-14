@@ -31,16 +31,13 @@ services:
       - REMOTION_PATH=/app/remotion
     volumes:
       - ./data:/app/data
-      - remotion_modules:/app/remotion/node_modules
-      - ./remotion:/app/remotion:ro
+      - ./remotion:/app/remotion
       - ./credentials:/app/credentials:ro
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
-      remotion:
-        condition: service_started
 
   worker:
     build: ./backend
@@ -58,22 +55,13 @@ services:
       - REMOTION_PATH=/app/remotion
     volumes:
       - ./data:/app/data
-      - remotion_modules:/app/remotion/node_modules
-      - ./remotion:/app/remotion:ro
+      - ./remotion:/app/remotion
       - ./credentials:/app/credentials:ro
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
-      remotion:
-        condition: service_started
-
-  remotion:
-    build: ./remotion
-    restart: unless-stopped
-    volumes:
-      - remotion_modules:/app/remotion/node_modules
 
   db:
     image: postgres:16-alpine
@@ -119,4 +107,3 @@ volumes:
   n8ndata:
   caddy_data:
   caddy_config:
-  remotion_modules:
