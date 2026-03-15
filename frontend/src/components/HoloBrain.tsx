@@ -38,7 +38,7 @@ const holoVertexShader = /* glsl */ `
     float size = aSize + pulse;
 
     vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-    gl_PointSize = size * (25.0 / -mvPosition.z);
+    gl_PointSize = size * (16.0 / -mvPosition.z);
     gl_PointSize = clamp(gl_PointSize, 0.5, 8.0);
     gl_Position = projectionMatrix * mvPosition;
   }
@@ -58,13 +58,13 @@ const holoFragmentShader = /* glsl */ `
     if (dist > 0.5) discard;
 
     // Core bright, edge fades — creates defined dot look
-    float alpha = 1.0 - smoothstep(0.15, 0.5, dist);
+    float alpha = 1.0 - smoothstep(0.05, 0.35, dist);
 
     // Subtle flicker per particle
     float flicker = 0.9 + 0.1 * sin(uTime * 1.5 + vPhase * 6.28);
 
     // Inner particles: dimmer for depth perception
-    float depthFade = mix(1.0, 0.5, vDepth);
+    float depthFade = mix(1.0, 0.25, vDepth);
 
     gl_FragColor = vec4(vColor * flicker * depthFade, alpha * uOpacity);
   }
@@ -168,14 +168,14 @@ function BrainCloud({ state }: { state: BrainState }) {
       } else {
         // Surface: bright cyan, slight variation by height
         colors[i * 3] = 0.0
-        colors[i * 3 + 1] = 0.55 + hf * 0.35  // green channel: 0.55-0.9
-        colors[i * 3 + 2] = 0.65 + hf * 0.35  // blue channel: 0.65-1.0
+        colors[i * 3 + 1] = 0.45 + hf * 0.35  // green channel: 0.45-0.8
+        colors[i * 3 + 2] = 0.55 + hf * 0.35  // blue channel: 0.55-0.9
       }
 
       // Tiny points — key to seeing individual particles
       sizes[i] = d > 0.3
-        ? 0.6 + hash(i, 30) * 0.8   // inner: 0.6-1.4
-        : 0.3 + hash(i, 30) * 0.5   // surface: 0.3-0.8
+        ? 0.3 + hash(i, 30) * 0.4   // inner: 0.3-0.7
+        : 0.15 + hash(i, 30) * 0.25 // surface: 0.15-0.4
 
       phases[i] = hash(i, 40) * Math.PI * 2
     }
@@ -194,7 +194,7 @@ function BrainCloud({ state }: { state: BrainState }) {
         uTime: { value: 0 },
         uPulseSpeed: { value: 1.2 },
         uPulseAmp: { value: 0.15 },
-        uOpacity: { value: 0.55 },
+        uOpacity: { value: 0.30 },
       },
       transparent: true,
       blending: THREE.AdditiveBlending,
@@ -216,7 +216,7 @@ function BrainCloud({ state }: { state: BrainState }) {
     mat.uniforms.uTime.value = t
     mat.uniforms.uPulseSpeed.value = isThinking ? 4.0 : isResponding ? 2.5 : 1.0
     mat.uniforms.uPulseAmp.value = isThinking ? 0.3 : isResponding ? 0.2 : 0.1
-    mat.uniforms.uOpacity.value = isIdle ? 0.5 : 0.65
+    mat.uniforms.uOpacity.value = isIdle ? 0.30 : 0.45
 
     // Slow auto-rotation
     const autoSpeed = isThinking ? 0.06 : isResponding ? 0.04 : 0.01
